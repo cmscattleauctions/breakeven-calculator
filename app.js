@@ -1,25 +1,18 @@
 (function () {
   const $ = (id) => document.getElementById(id);
+  const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
 
-  function setText(id, v) { const el = $(id); if (el) el.textContent = v; }
-
-  // ---------- Formatting ----------
+  // -------- Format helpers --------
   function money(x) {
     if (!isFinite(x)) return "—";
     return "$" + x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  function moneyPerCwt(x) { return isFinite(x) ? `${money(x)} /cwt` : "—"; }
-  function moneyPerHd(x) { return isFinite(x) ? `${money(x)} /hd` : "—"; }
-  function pct(x) { return isFinite(x) ? (x * 100).toFixed(2) + "%" : "—"; }
-  function fmtNum(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : "—"; }
+  const moneyPerCwt = (x) => isFinite(x) ? `${money(x)} /cwt` : "—";
+  const moneyPerHd  = (x) => isFinite(x) ? `${money(x)} /hd` : "—";
+  const pct         = (x) => isFinite(x) ? (x * 100).toFixed(2) + "%" : "—";
+  const fmtNum      = (x, d=2) => isFinite(x) ? Number(x).toFixed(d) : "—";
 
-  // ---------- Parsing ----------
-  function numOrNaNFromTextInput(id) {
-    const raw = String($(id)?.dataset?.value ?? $(id)?.value ?? "").trim();
-    if (raw === "" || raw === "—") return NaN;
-    const v = Number(raw);
-    return isFinite(v) ? v : NaN;
-  }
+  // -------- Parse helpers --------
   function numOrNaN(id) {
     const raw = String($(id)?.value ?? "").trim();
     if (raw === "") return NaN;
@@ -38,12 +31,11 @@
     return out;
   }
 
-  function clearError() { setText("errorText", ""); }
-  function softError(msg) { setText("errorText", msg || ""); }
+  function clearError(){ setText("errorText",""); }
+  function softError(msg){ setText("errorText", msg || ""); }
 
-  // ---------- Status coloring ----------
-  // GOOD >= +$50/hd, MID -$25 to +$50, BAD < -$25
-  function applyStatus(plPerHd) {
+  // -------- Status coloring --------
+  function applyStatus(plPerHd){
     const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
     tiles.forEach(t => t.classList.remove("good","mid","bad"));
     if (!isFinite(plPerHd)) return;
@@ -51,149 +43,24 @@
     tiles.forEach(t => t.classList.add(cls));
   }
 
-  // ---------- Picker Modal ----------
-  const overlay = $("pickerOverlay");
-  const wheel = $("pickerWheel");
-  const titleEl = $("pickerTitle");
-  const btnCancel = $("pickerCancel");
-  const btnDone = $("pickerDone");
-
-  let pickerState = null; // { inputEl, title, values:[{label,value}], selectedIndex }
-
-  function buildWheel(values, selectedIndex) {
-    wheel.innerHTML = "";
-    const frag = document.createDocumentFragment();
-    values.forEach((v, i) => {
-      const div = document.createElement("div");
-      div.className = "wheelItem";
-      div.dataset.index = String(i);
-      div.textContent = v.label;
-      frag.appendChild(div);
-    });
-    wheel.appendChild(frag);
-
-    // position wheel to selected
-    requestAnimationFrame(() => {
-      const items = wheel.querySelectorAll(".wheelItem");
-      const target = items[selectedIndex];
-      if (target) target.scrollIntoView({ block: "center" });
-      markActive();
-    });
-  }
-
-  function markActive() {
-    const items = wheel.querySelectorAll(".wheelItem");
-    if (!items.length) return;
-
-    // find the item closest to center
-    const rect = wheel.getBoundingClientRect();
-    const centerY = rect.top + rect.height / 2;
-
-    let bestIdx = 0;
-    let bestDist = Infinity;
-
-    items.forEach((el, idx) => {
-      const r = el.getBoundingClientRect();
-      const y = r.top + r.height / 2;
-      const d = Math.abs(y - centerY);
-      if (d < bestDist) { bestDist = d; bestIdx = idx; }
-    });
-
-    items.forEach(el => el.classList.remove("active"));
-    if (items[bestIdx]) items[bestIdx].classList.add("active");
-
-    if (pickerState) pickerState.selectedIndex = bestIdx;
-  }
-
-  let scrollTimer = null;
-  wheel.addEventListener("scroll", () => {
-    if (scrollTimer) clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => markActive(), 60);
-  }, { passive: true });
-
-  function openPicker(inputEl, cfg) {
-    const { title, values, defaultValue } = cfg;
-
-    // determine current selection
-    let current = inputEl.dataset.value;
-    if (current === undefined || current === "" || current === "—") current = String(defaultValue);
-
-    let selectedIndex = values.findIndex(v => String(v.value) === String(current));
-    if (selectedIndex < 0) selectedIndex = 0;
-
-    pickerState = { inputEl, title, values, selectedIndex };
-
-    titleEl.textContent = title;
-    overlay.classList.remove("hidden");
-    overlay.setAttribute("aria-hidden", "false");
-
-    buildWheel(values, selectedIndex);
-  }
-
-  function closePicker() {
-    overlay.classList.add("hidden");
-    overlay.setAttribute("aria-hidden", "true");
-    wheel.innerHTML = "";
-    pickerState = null;
-  }
-
-  btnCancel.addEventListener("click", closePicker);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closePicker();
-  });
-
-  btnDone.addEventListener("click", () => {
-    if (!pickerState) return;
-
-    const chosen = pickerState.values[pickerState.selectedIndex];
-    const inputEl = pickerState.inputEl;
-
-    inputEl.value = chosen.label;
-    inputEl.dataset.value = String(chosen.value);
-
-    closePicker();
-    updateAll();
-  });
-
-  // ---------- Picker data builders ----------
-  function rangeValues({ start, end, step, decimals, suffix = "" }) {
-    const vals = [];
-    const n = Math.round((end - start) / step);
-    for (let i = 0; i <= n; i++) {
-      const v = start + i * step;
-      const value = Number(v.toFixed(decimals));
-      vals.push({ value, label: value.toFixed(decimals) + suffix });
-    }
-    return vals;
-  }
-
-  function rangeValuesDesc({ start, end, step, decimals, suffix = "" }) {
-    const vals = [];
-    const n = Math.round((start - end) / step);
-    for (let i = 0; i <= n; i++) {
-      const v = start - i * step;
-      const value = Number(v.toFixed(decimals));
-      vals.push({ value, label: value.toFixed(decimals) + suffix });
-    }
-    return vals;
-  }
-
-  // ---------- Derived displays ----------
-  function updateHeadOwnedOnly() {
+  // -------- Derived displays --------
+  function updateHeadOwned(){
     const totalHead = numOrNaN("totalHead");
     const ownershipPct = numOrNaN("ownershipPct");
-    const headOwnedEl = $("headOwned");
-    if (!headOwnedEl) return;
+    const el = $("headOwned");
+    if (!el) return;
 
-    if (isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct > 0) {
+    if (isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct >= 0) {
       const myHead = totalHead * (ownershipPct / 100.0);
-      headOwnedEl.value = myHead.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      el.value = myHead.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      setText("d_myHead", el.value);
     } else {
-      headOwnedEl.value = "—";
+      el.value = "—";
+      setText("d_myHead", "—");
     }
   }
 
-  function updateADGOnly() {
+  function updateADG(){
     const daysOnFeed = numOrNaN("daysOnFeed");
     const inWeight = numOrNaN("inWeight");
     const outWeight = numOrNaN("outWeight");
@@ -207,10 +74,11 @@
     }
   }
 
-  function updateOutDateInline() {
+  function updateOutDateInline(){
     const inDate = parseDateOrNull("inDate");
     const daysOnFeed = numOrNaN("daysOnFeed");
     const outEl = $("outDateInline");
+    if (!outEl) return null;
 
     if (inDate && isFinite(daysOnFeed) && daysOnFeed > 0) {
       const outDate = addDays(inDate, daysOnFeed);
@@ -221,31 +89,16 @@
     return null;
   }
 
-  // ---------- Outputs reset ----------
-  function resetOutputs() {
-    setText("plPerHd","—");
-    setText("projectedTotalPL","—");
-    setText("plPerCwt","—");
-    setText("breakEvenCwt","—");
-    setText("salesPrice","—");
-    setText("capitalInvested","—");
-    setText("cattleSales","—");
-    setText("roe","—");
-    setText("annualRoe","—");
-    setText("irr","—");
-
-    setText("d_myHead","—");
-    setText("d_costPerHd","—");
-    setText("d_deadLossDollars","—");
-    setText("d_feedCost","—");
-    setText("d_perHdCOG","—");
-    setText("d_interestPerHd","—");
-    setText("d_totalCostPerHd","—");
-    setText("d_salesPerHd","—");
-    setText("d_equityBase","—");
+  // -------- Outputs reset --------
+  function resetOutputs(){
+    ["plPerHd","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
+     "capitalInvested","cattleSales","roe","annualRoe","irr",
+     "d_costPerHd","d_deadLossDollars","d_feedCost","d_perHdCOG","d_interestPerHd",
+     "d_totalCostPerHd","d_salesPerHd","d_equityBase"
+    ].forEach(id => setText(id, "—"));
   }
 
-  // ---------- IRR (two-point) ----------
+  // -------- IRR (two-point) --------
   function irrTwoPoint(c0, c1, d0, d1) {
     const msPerDay = 24 * 60 * 60 * 1000;
     const t = (d1 - d0) / msPerDay / 365.0;
@@ -255,33 +108,35 @@
     return NaN;
   }
 
-  // ---------- Main calc ----------
-  function updateAll() {
+  // -------- Main calc --------
+  function updateAll(){
     clearError();
-
-    updateHeadOwnedOnly();
-    updateADGOnly();
+    updateHeadOwned();
+    updateADG();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
     // Equity fixed 30%
     const equityUsed = 0.30;
 
-    // Read picker values from dataset.value (numeric)
-    const interestRatePct = numOrNaNFromTextInput("interestRatePct");
-    const cogNoInterest = numOrNaNFromTextInput("cogNoInterest");
-    const deathLossPct = numOrNaNFromTextInput("deathLossPct");
-    const basis = numOrNaNFromTextInput("basis");
-
-    // Standard inputs
+    // Inputs
     const daysOnFeed = numOrNaN("daysOnFeed");
+    const interestRatePct = numOrNaN("interestRatePct"); // typed on web, picker on mobile
+    const interestRate = interestRatePct / 100.0;
+
     const totalHead = numOrNaN("totalHead");
     const ownership = numOrNaN("ownershipPct") / 100.0;
 
     const inWeight = numOrNaN("inWeight");
     const priceCwt = numOrNaN("priceCwt");
     const outWeight = numOrNaN("outWeight");
+
+    const cogNoInterest = numOrNaN("cogNoInterest");
+    const deathLossPct = numOrNaN("deathLossPct");
+    const deathLoss = deathLossPct / 100.0;
+
     const futures = numOrNaN("futures");
+    const basis = numOrNaN("basis");
 
     // Guardrails
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
@@ -295,11 +150,10 @@
       return;
     }
 
-    // Core prerequisites
     const haveCore =
       isFinite(daysOnFeed) && daysOnFeed > 0 &&
-      isFinite(interestRatePct) &&
-      isFinite(deathLossPct) &&
+      isFinite(interestRate) && interestRate >= 0 &&
+      isFinite(deathLoss) && deathLoss >= 0 &&
       isFinite(inWeight) && inWeight > 0 &&
       isFinite(priceCwt) &&
       isFinite(outWeight) && outWeight > 0 &&
@@ -307,14 +161,10 @@
 
     if (!haveCore) {
       resetOutputs();
-      // still show sales price if futures+basis are present
       if (isFinite(futures) && isFinite(basis)) setText("salesPrice", moneyPerCwt(futures + basis));
       applyStatus(NaN);
       return;
     }
-
-    const interestRate = interestRatePct / 100.0;
-    const deathLoss = deathLossPct / 100.0;
 
     const gained = outWeight - inWeight;
 
@@ -331,7 +181,6 @@
 
     setText("breakEvenCwt", moneyPerCwt(breakEvenCwt));
 
-    // details
     setText("d_costPerHd", money(costPerHd));
     setText("d_deadLossDollars", money(deadLossDollars));
     setText("d_feedCost", money(feedCost));
@@ -341,18 +190,17 @@
 
     // Sales side
     if (!(isFinite(futures) && isFinite(basis))) {
-      setText("salesPrice", "—");
-      setText("plPerCwt", "—");
-      setText("plPerHd", "—");
-      setText("projectedTotalPL", "—");
-      setText("capitalInvested", "—");
-      setText("cattleSales", "—");
-      setText("roe", "—");
-      setText("annualRoe", "—");
-      setText("irr", "—");
-      setText("d_salesPerHd", "—");
-      setText("d_equityBase", "—");
-      setText("d_myHead", "—");
+      setText("salesPrice","—");
+      setText("plPerCwt","—");
+      setText("plPerHd","—");
+      setText("projectedTotalPL","—");
+      setText("capitalInvested","—");
+      setText("cattleSales","—");
+      setText("roe","—");
+      setText("annualRoe","—");
+      setText("irr","—");
+      setText("d_salesPerHd","—");
+      setText("d_equityBase","—");
       applyStatus(NaN);
       return;
     }
@@ -371,20 +219,18 @@
     // Totals
     const haveTotals = isFinite(totalHead) && totalHead > 0 && isFinite(ownership) && ownership > 0;
     if (!haveTotals) {
-      setText("projectedTotalPL", "—");
-      setText("capitalInvested", "—");
-      setText("cattleSales", "—");
-      setText("roe", "—");
-      setText("annualRoe", "—");
-      setText("irr", "—");
-      setText("d_equityBase", "—");
-      setText("d_myHead", "—");
+      setText("projectedTotalPL","—");
+      setText("capitalInvested","—");
+      setText("cattleSales","—");
+      setText("roe","—");
+      setText("annualRoe","—");
+      setText("irr","—");
+      setText("d_equityBase","—");
       applyStatus(plPerHd);
       return;
     }
 
     const myHead = totalHead * ownership;
-    setText("d_myHead", myHead.toLocaleString(undefined, { maximumFractionDigits: 2 }));
 
     const capitalInvested = totalCostPerHd * myHead;
     const cattleSales = salesPerHd * myHead;
@@ -408,49 +254,151 @@
       const irr = irrTwoPoint(-capitalInvested, cattleSales, inDate, outDate);
       setText("irr", pct(irr));
     } else {
-      setText("irr", "—");
+      setText("irr","—");
     }
 
     applyStatus(plPerHd);
   }
 
-  // ---------- Wiring + defaults ----------
-  function setPickerDefault(inputId, label, value) {
-    const el = $(inputId);
-    el.value = label;
-    el.dataset.value = String(value);
+  // ================== Mobile wheel picker (only for phones) ==================
+  const overlay = $("pickerOverlay");
+  const wheel = $("pickerWheel");
+  const titleEl = $("pickerTitle");
+  const btnCancel = $("pickerCancel");
+  const btnDone = $("pickerDone");
+
+  let pickerState = null; // { inputEl, title, values:[{label,value}], selectedIndex }
+
+  function isPhoneLike() {
+    // Prefer “phone” experience on coarse pointers OR small screens
+    return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 700;
   }
 
-  function attachPicker(inputId, cfg) {
-    const el = $(inputId);
+  function buildWheel(values, selectedIndex) {
+    wheel.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    values.forEach((v, i) => {
+      const div = document.createElement("div");
+      div.className = "wheelItem";
+      div.dataset.index = String(i);
+      div.textContent = v.label;
+      frag.appendChild(div);
+    });
+    wheel.appendChild(frag);
+
+    requestAnimationFrame(() => {
+      const items = wheel.querySelectorAll(".wheelItem");
+      const target = items[selectedIndex];
+      if (target) target.scrollIntoView({ block: "center" });
+      markActive();
+    });
+  }
+
+  function markActive() {
+    const items = wheel.querySelectorAll(".wheelItem");
+    if (!items.length) return;
+
+    const rect = wheel.getBoundingClientRect();
+    const centerY = rect.top + rect.height / 2;
+
+    let bestIdx = 0;
+    let bestDist = Infinity;
+
+    items.forEach((el, idx) => {
+      const r = el.getBoundingClientRect();
+      const y = r.top + r.height / 2;
+      const d = Math.abs(y - centerY);
+      if (d < bestDist) { bestDist = d; bestIdx = idx; }
+    });
+
+    items.forEach(el => el.classList.remove("active"));
+    if (items[bestIdx]) items[bestIdx].classList.add("active");
+    if (pickerState) pickerState.selectedIndex = bestIdx;
+  }
+
+  let scrollTimer = null;
+  wheel?.addEventListener("scroll", () => {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => markActive(), 60);
+  }, { passive: true });
+
+  function openPicker(inputEl, cfg) {
+    if (!isPhoneLike()) return; // web view: type normally
+
+    const { title, values, defaultValue } = cfg;
+
+    let current = String(inputEl.value ?? "").trim();
+    if (!current) current = String(defaultValue);
+
+    let selectedIndex = values.findIndex(v => v.label === current || String(v.value) === current);
+    if (selectedIndex < 0) selectedIndex = 0;
+
+    pickerState = { inputEl, title, values, selectedIndex };
+    titleEl.textContent = title;
+
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+
+    buildWheel(values, selectedIndex);
+  }
+
+  function closePicker() {
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+    wheel.innerHTML = "";
+    pickerState = null;
+  }
+
+  btnCancel?.addEventListener("click", closePicker);
+  overlay?.addEventListener("click", (e) => { if (e.target === overlay) closePicker(); });
+
+  btnDone?.addEventListener("click", () => {
+    if (!pickerState) return;
+    const chosen = pickerState.values[pickerState.selectedIndex];
+    pickerState.inputEl.value = chosen.label;
+    closePicker();
+    updateAll();
+  });
+
+  function rangeValues({ start, end, step, decimals }) {
+    const vals = [];
+    const n = Math.round((end - start) / step);
+    for (let i = 0; i <= n; i++) {
+      const v = start + i * step;
+      const value = Number(v.toFixed(decimals));
+      vals.push({ value, label: value.toFixed(decimals) });
+    }
+    return vals;
+  }
+
+  // Attach mobile pickers to fields (but keep them typeable on web)
+  function attachMobilePicker(id, cfg) {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("focus", (e) => {
+      if (isPhoneLike()) { e.target.blur(); openPicker(el, cfg); }
+    });
     el.addEventListener("click", () => openPicker(el, cfg));
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPicker(el, cfg); }
-    });
   }
 
+  // -------- Reset --------
   function resetAll() {
-    // standard inputs
-    ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"].forEach(id => {
-      if ($(id)) $(id).value = "";
-    });
+    ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"].forEach(id => { if ($(id)) $(id).value = ""; });
 
-    // defaults
     const t = new Date();
     const yyyy = t.getFullYear();
     const mm = String(t.getMonth()+1).padStart(2,"0");
     const dd = String(t.getDate()).padStart(2,"0");
     if ($("inDate")) $("inDate").value = `${yyyy}-${mm}-${dd}`;
+
     if ($("ownershipPct")) $("ownershipPct").value = "100";
 
-    // picker defaults
-    setPickerDefault("pickYear", String(yyyy), yyyy);
-    setPickerDefault("interestRatePct", "7.25", 7.25);
-    setPickerDefault("cogNoInterest", "1.10", 1.10);
-    setPickerDefault("deathLossPct", "1.0", 1.0);
-    setPickerDefault("basis", "0.0", 0.0);
+    // defaults for typed fields
+    if ($("interestRatePct")) $("interestRatePct").value = "7.5";
+    if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
+    if ($("deathLossPct")) $("deathLossPct").value = "1.0";
+    if ($("basis")) $("basis").value = "0.0";
 
-    // derived display
     if ($("adg")) $("adg").value = "—";
     if ($("headOwned")) $("headOwned").value = "—";
     if ($("outDateInline")) $("outDateInline").value = "—";
@@ -461,8 +409,8 @@
     updateAll();
   }
 
+  // -------- Init --------
   window.addEventListener("DOMContentLoaded", () => {
-    // date default
     const t = new Date();
     const yyyy = t.getFullYear();
     const mm = String(t.getMonth()+1).padStart(2,"0");
@@ -470,33 +418,30 @@
     if ($("inDate") && !$("inDate").value) $("inDate").value = `${yyyy}-${mm}-${dd}`;
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
 
-    // picker value lists
-    const yearVals = [];
-    for (let y = 2020; y <= 2035; y++) yearVals.push({ value: y, label: String(y) });
+    // defaults
+    if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.5";
+    if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
+    if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
+    if ($("basis") && !$("basis").value) $("basis").value = "0.0";
 
-    const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2, suffix: "" });
-    const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1, suffix: "" });
-    // Interest: 0.00 -> 25.00 by 0.01 (wheel-size, but manageable)
-    const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.01, decimals: 2, suffix: "" });
-    // Basis: +100 down to -100 by 0.5 (per your earlier “start +100 down to -100”)
-    const basisVals = rangeValuesDesc({ start: 100.0, end: -100.0, step: 0.5, decimals: 1, suffix: "" });
+    // Mobile picker lists:
+    // Interest: 0–25 in 0.5 steps
+    const irVals  = rangeValues({ start: 0.0, end: 25.0, step: 0.5, decimals: 1 });
+    // COG: 0.75–1.50 in 0.01 steps
+    const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
+    // Death loss: 0–100 in 0.5 steps
+    const dlVals  = rangeValues({ start: 0.0, end: 100.0, step: 0.5, decimals: 1 });
+    // Basis: -100–100 in 0.5 steps
+    const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 0.5, decimals: 1 });
 
-    // defaults (if missing)
-    if (!$("pickYear").dataset.value) setPickerDefault("pickYear", String(yyyy), yyyy);
-    if (!$("interestRatePct").dataset.value) setPickerDefault("interestRatePct", "7.25", 7.25);
-    if (!$("cogNoInterest").dataset.value) setPickerDefault("cogNoInterest", "1.10", 1.10);
-    if (!$("deathLossPct").dataset.value) setPickerDefault("deathLossPct", "1.0", 1.0);
-    if (!$("basis").dataset.value) setPickerDefault("basis", "0.0", 0.0);
+    attachMobilePicker("interestRatePct", { title:"Interest Rate (%)", values: irVals, defaultValue: 7.5 });
+    attachMobilePicker("cogNoInterest",   { title:"Projected COG", values: cogVals, defaultValue: 1.10 });
+    attachMobilePicker("deathLossPct",    { title:"Death Loss (%)", values: dlVals, defaultValue: 1.0 });
+    attachMobilePicker("basis",           { title:"Expected Basis", values: bVals, defaultValue: 0.0 });
 
-    // attach pickers
-    attachPicker("pickYear",        { title: "Year", values: yearVals, defaultValue: yyyy });
-    attachPicker("cogNoInterest",   { title: "Projected COG", values: cogVals, defaultValue: 1.10 });
-    attachPicker("deathLossPct",    { title: "Death Loss (%)", values: dlVals, defaultValue: 1.0 });
-    attachPicker("interestRatePct", { title: "Interest Rate (%)", values: irVals, defaultValue: 7.25 });
-    attachPicker("basis",           { title: "Expected Basis", values: basisVals, defaultValue: 0.0 });
-
-    // bind normal inputs
-    const ids = ["inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"];
+    // Auto-calc on standard inputs
+    const ids = ["inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures",
+                 "interestRatePct","cogNoInterest","deathLossPct","basis"];
     ids.forEach(id => {
       const el = $(id);
       if (!el) return;
@@ -505,30 +450,7 @@
     });
 
     $("resetBtn")?.addEventListener("click", resetAll);
-
     updateAll();
   });
 
-  // helper to build ranges
-  function rangeValues({ start, end, step, decimals, suffix = "" }) {
-    const vals = [];
-    const n = Math.round((end - start) / step);
-    for (let i = 0; i <= n; i++) {
-      const v = start + i * step;
-      const value = Number(v.toFixed(decimals));
-      vals.push({ value, label: value.toFixed(decimals) + suffix });
-    }
-    return vals;
-  }
-
-  function rangeValuesDesc({ start, end, step, decimals, suffix = "" }) {
-    const vals = [];
-    const n = Math.round((start - end) / step);
-    for (let i = 0; i <= n; i++) {
-      const v = start - i * step;
-      const value = Number(v.toFixed(decimals));
-      vals.push({ value, label: value.toFixed(decimals) + suffix });
-    }
-    return vals;
-  }
 })();
