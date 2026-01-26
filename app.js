@@ -40,15 +40,16 @@
   function clearError() { setText("errorText", ""); }
   function softError(msg) { setText("errorText", msg || ""); }
 
-  // Slider labels
-  function syncSliderLabels() {
-    const cog = numOrNaN("cogNoInterest");
-    const dl = numOrNaN("deathLossPct");
-    const basis = numOrNaN("basis");
+  // Tile coloring based on P/L per head
+  // GOOD >= +$50/hd, MID between -$25 and +$50, BAD < -$25
+  function applyStatus(plPerHd) {
+    const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
+    tiles.forEach(t => t.classList.remove("good","mid","bad"));
 
-    setText("cogVal", isFinite(cog) ? fmtNum(cog, 2) : "—");
-    setText("dlVal", isFinite(dl) ? fmtNum(dl, 1) + "%" : "—");
-    setText("basisVal", isFinite(basis) ? fmtNum(basis, 1) : "—");
+    if (!isFinite(plPerHd)) return;
+
+    const cls = (plPerHd >= 50) ? "good" : (plPerHd >= -25 ? "mid" : "bad");
+    tiles.forEach(t => t.classList.add(cls));
   }
 
   // Reset outputs
@@ -83,21 +84,6 @@
     if (adgEl) adgEl.value = "—";
     const headOwnedEl = $("headOwned");
     if (headOwnedEl) headOwnedEl.value = "—";
-  }
-
-  // Tile coloring based on P/L per head
-  // Thresholds (adjustable):
-  //   GOOD: >= +$50/hd
-  //   MID:  between -$25 and +$50
-  //   BAD:  < -$25
-  function applyStatus(plPerHd) {
-    const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
-    tiles.forEach(t => t.classList.remove("good","mid","bad"));
-
-    if (!isFinite(plPerHd)) return;
-
-    const cls = (plPerHd >= 50) ? "good" : (plPerHd >= -25 ? "mid" : "bad");
-    tiles.forEach(t => t.classList.add(cls));
   }
 
   // IRR (two-point)
@@ -154,11 +140,47 @@
     }
   }
 
+  // Clamp helper
+  function clamp(val, min, max) {
+    if (!isFinite(val)) return val;
+    return Math.min(max, Math.max(min, val));
+  }
+
+  // Make a number input “scrollable”: wheel/trackpad increments by step within min/max
+  function enableScrollStep(id) {
+    const el = $(id);
+    if (!el) return;
+
+    el.addEventListener("wheel", (e) => {
+      // prevent the page from scrolling when the user intends to change the value
+      e.preventDefault();
+
+      const stepAttr = el.getAttribute("step");
+      const step = stepAttr ? Number(stepAttr) : 1;
+
+      const minAttr = el.getAttribute("min");
+      const maxAttr = el.getAttribute("max");
+      const min = (minAttr !== null) ? Number(minAttr) : -Infinity;
+      const max = (maxAttr !== null) ? Number(maxAttr) : Infinity;
+
+      const current = (el.value === "" ? 0 : Number(el.value));
+      if (!isFinite(current)) return;
+
+      // wheel down => increase? users typically expect wheel up increases; we'll do that:
+      const direction = (e.deltaY < 0) ? 1 : -1; // up => +, down => -
+      const next = clamp(current + direction * step, min, max);
+
+      // fix floating point noise
+      const decimals = (String(step).split(".")[1] || "").length;
+      el.value = (decimals > 0) ? next.toFixed(decimals) : String(next);
+
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }, { passive: false });
+  }
+
   function updateAll() {
     clearError();
 
-    // Always sync sliders + derived displays first
-    syncSliderLabels();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateOnly();
     updateADGOnly();
@@ -178,11 +200,11 @@
     const priceCwt = numOrNaN("priceCwt");
     const outWeight = numOrNaN("outWeight");
 
-    const cogNoInterest = numOrNaN("cogNoInterest");     // slider
-    const deathLossPct = numOrNaN("deathLossPct") / 100.0; // slider (percent)
+    const cogNoInterest = numOrNaN("cogNoInterest");
+    const deathLossPct = numOrNaN("deathLossPct") / 100.0;
 
     const futures = numOrNaN("futures");
-    const basis = numOrNaN("basis"); // slider
+    const basis = numOrNaN("basis");
 
     // Soft guardrails
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
@@ -196,7 +218,7 @@
       return;
     }
 
-    // Core prereqs for BE
+    // Core prereqs
     const haveCore =
       isFinite(daysOnFeed) && daysOnFeed > 0 &&
       isFinite(interestRate) && interestRate >= 0 &&
@@ -211,7 +233,6 @@
       resetTotalsOutputs();
       applyStatus(NaN);
 
-      // Sales price convenience
       if (isFinite(futures) && isFinite(basis)) {
         setText("salesPrice", moneyPerCwt(futures + basis));
       }
@@ -241,7 +262,7 @@
     setText("d_interestPerHd", money(interestPerHd));
     setText("d_totalCostPerHd", money(totalCostPerHd));
 
-    // Sales-side prereqs
+    // Sales-side
     const haveSalesSide = isFinite(futures) && isFinite(basis);
     if (!haveSalesSide) {
       setText("salesPrice", "—");
@@ -265,11 +286,11 @@
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
 
-    // Totals prereqs
+    // Totals
     const haveTotals = isFinite(totalHead) && totalHead > 0 && isFinite(ownership) && ownership > 0;
     if (!haveTotals) {
       resetTotalsOutputs();
-      applyStatus(plPerHd); // still color P/L tiles if we have plPerHd
+      applyStatus(plPerHd);
       return;
     }
 
@@ -304,12 +325,11 @@
       setText("irr", "—");
     }
 
-    // Apply status coloring based on P/L per head
     applyStatus(plPerHd);
   }
 
   function resetAll() {
-    // Preserve slider defaults by setting values explicitly
+    // Set roller defaults explicitly
     if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
     if ($("basis")) $("basis").value = "0";
@@ -333,9 +353,9 @@
     resetDerivedInputs();
     resetCoreOutputs();
     resetTotalsOutputs();
-    syncSliderLabels();
     updateOutDateOnly();
     applyStatus(NaN);
+    updateAll();
   }
 
   window.addEventListener("DOMContentLoaded", () => {
@@ -347,12 +367,17 @@
     if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
 
-    // Ensure slider defaults
+    // Roller defaults
     if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
     if ($("basis") && !$("basis").value) $("basis").value = "0";
 
-    // Bind events
+    // Enable scroll-to-increment on these “rollers”
+    enableScrollStep("cogNoInterest");
+    enableScrollStep("deathLossPct");
+    enableScrollStep("basis");
+
+    // Auto-calc on changes
     const ids = [
       "inDate","daysOnFeed","totalHead","ownershipPct","interestRatePct",
       "inWeight","priceCwt","outWeight","futures",
@@ -367,8 +392,6 @@
 
     $("resetBtn")?.addEventListener("click", resetAll);
 
-    // First paint
-    syncSliderLabels();
     updateAll();
   });
 })();
