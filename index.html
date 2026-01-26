@@ -16,7 +16,6 @@
       --soft:#eef2f7;
       --disabled:#f2f4f8;
 
-      /* status colors */
       --good-bg:#ecfdf5;
       --good-bd:#10b981;
       --good-tx:#065f46;
@@ -50,7 +49,7 @@
       font-size:13px;
       opacity:.95;
       line-height:1.35;
-      max-width:1040px;
+      max-width:1100px;
     }
 
     main{
@@ -109,42 +108,6 @@
 
     .stack{ display:flex; flex-direction:column; gap:10px; }
 
-    /* slider blocks */
-    .sliderBox{
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:10px 10px 8px;
-      background:#fff;
-    }
-    .sliderTop{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:baseline;
-      margin-bottom:6px;
-    }
-    .sliderTop .name{
-      font-size:12px;
-      color:var(--muted);
-      font-weight:700;
-    }
-    .sliderTop .val{
-      font-size:13px;
-      font-weight:900;
-      color:#0f172a;
-      white-space:nowrap;
-    }
-    input[type="range"]{
-      width:100%;
-      margin:2px 0 6px;
-    }
-    .sliderHint{
-      display:flex;
-      justify-content:space-between;
-      font-size:11px;
-      color:var(--muted);
-    }
-
     .actions{
       display:flex;
       gap:10px;
@@ -169,7 +132,7 @@
       min-height:18px;
     }
 
-    /* RESULTS LAYOUT: keep on one page */
+    /* Results */
     .resultsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -188,11 +151,8 @@
     }
     .metric .k{ font-size:12px; color:var(--muted); }
     .metric .v{ font-size:18px; font-weight:900; margin-top:2px; }
-
-    /* small metrics for Breakeven + Sales Price */
     .metric.small .v{ font-size:15px; font-weight:900; }
 
-    /* status coloring (applied to P/L-related tiles) */
     .metric.good{ background:var(--good-bg); border-color:var(--good-bd); color:var(--good-tx); }
     .metric.mid{  background:var(--mid-bg);  border-color:var(--mid-bd);  color:var(--mid-tx); }
     .metric.bad{  background:var(--bad-bg);  border-color:var(--bad-bd);  color:var(--bad-tx); }
@@ -244,7 +204,7 @@
   <header>
     <h1>CMS Breakeven Calculator</h1>
     <p>
-      Auto-calculates as you type. <span class="pill">Out Date</span> appears once In Date + DOF exist.
+      Auto-calculates as you type. Use the arrows or scroll on COG / Death Loss / Basis to “roll” values.
       Color status is based on <span class="pill">P/L per head</span>.
     </p>
   </header>
@@ -267,7 +227,6 @@
             <input id="interestRatePct" type="number" step="0.01" inputmode="decimal" placeholder="7.25" />
           </div>
 
-          <!-- Total head + Ownership + Head owned display -->
           <div class="field">
             <label>Total Head</label>
             <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
@@ -299,19 +258,14 @@
             <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
           </div>
 
-          <!-- Proj COG roller (0.75–1.50, default 1.10) -->
+          <!-- COG as "roller" number input -->
           <div class="field">
-            <div class="sliderBox">
-              <div class="sliderTop">
-                <div class="name">Projected COG (no interest) ($/lb of gain)</div>
-                <div class="val" id="cogVal">1.10</div>
-              </div>
-              <input id="cogNoInterest" type="range" min="0.75" max="1.50" step="0.01" value="1.10" />
-              <div class="sliderHint"><span>0.75</span><span>1.50</span></div>
-            </div>
+            <label>Projected COG (no interest) ($/lb of gain)</label>
+            <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" />
+            <div class="note">Range 0.75–1.50. Default 1.10. Scroll/arrow to change.</div>
           </div>
 
-          <!-- Days on Feed moved BELOW Proj COG, with ADG stacked under it -->
+          <!-- Days on Feed moved below COG with ADG below it -->
           <div class="field stack">
             <div>
               <label>Days on Feed</label>
@@ -323,16 +277,11 @@
             </div>
           </div>
 
-          <!-- Death Loss roller (0–100%, 0.5 steps) -->
+          <!-- Death Loss as "roller" number input -->
           <div class="field">
-            <div class="sliderBox">
-              <div class="sliderTop">
-                <div class="name">Death Loss (%)</div>
-                <div class="val" id="dlVal">1.0%</div>
-              </div>
-              <input id="deathLossPct" type="range" min="0" max="100" step="0.5" value="1.0" />
-              <div class="sliderHint"><span>0%</span><span>100%</span></div>
-            </div>
+            <label>Death Loss (%)</label>
+            <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" />
+            <div class="note">Range 0–100 by 0.5. Scroll/arrow to change.</div>
           </div>
 
           <div class="field">
@@ -340,16 +289,11 @@
             <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
           </div>
 
-          <!-- Basis roller (-100 to +100, default 0) -->
+          <!-- Basis as "roller" number input -->
           <div class="field">
-            <div class="sliderBox">
-              <div class="sliderTop">
-                <div class="name">Expected Basis ($/cwt)</div>
-                <div class="val" id="basisVal">0</div>
-              </div>
-              <input id="basis" type="range" min="-100" max="100" step="0.5" value="0" />
-              <div class="sliderHint"><span>-100</span><span>+100</span></div>
-            </div>
+            <label>Expected Basis ($/cwt)</label>
+            <input id="basis" type="number" step="0.5" min="-100" max="100" inputmode="decimal" />
+            <div class="note">Range -100 to +100. Default 0. Scroll/arrow to change.</div>
           </div>
         </div>
 
@@ -361,7 +305,6 @@
 
         <div class="note">
           Equity is fixed at <strong>30%</strong>. Purchase price is <strong>$/cwt</strong>.
-          Sliders: Death Loss (0–100 by 0.5), COG (0.75–1.50), Basis (-100–+100).
         </div>
       </section>
 
