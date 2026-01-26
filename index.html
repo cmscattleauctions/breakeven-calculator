@@ -33,14 +33,9 @@
       background:var(--cms);
       color:#fff;
     }
-    header h1{
-      margin:0;
-      font-size:18px;
-      font-weight:900;
-      letter-spacing:.2px;
-    }
+    header h1{ margin:0; font-size:18px; font-weight:900; }
 
-    main{ max-width:1100px; margin:0 auto; padding:14px; }
+    main{ max-width:1200px; margin:0 auto; padding:14px; }
 
     .grid{
       display:grid;
@@ -61,19 +56,9 @@
     }
     .card h2{ margin:0 0 10px; font-size:15px; }
 
-    .row{
-      display:grid;
-      grid-template-columns:minmax(0,1fr);
-      gap:10px;
-    }
-    @media (min-width:560px){
-      .row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
-    }
-
-    .field{ min-width:0; }
     label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
 
-    input[type="number"], input[type="date"], input[type="text"]{
+    input{
       width:100%;
       padding:10px 11px;
       border:1px solid var(--border);
@@ -85,9 +70,14 @@
       outline:2px solid rgba(51,102,153,.25);
       border-color:rgba(51,102,153,.45);
     }
-    input[readonly]{ background:var(--disabled); color:#111827; cursor:pointer; }
+    /* Only formula fields are grey */
+    input[readonly]{
+      background:var(--disabled);
+      color:#111827;
+      cursor:default;
+    }
 
-    .stack{ display:flex; flex-direction:column; gap:10px; }
+    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
     .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
     button{
@@ -100,7 +90,16 @@
     }
     .secondary{ background:#e8eef7; color:#0f172a; }
 
-    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
+    /* Web layout: two columns INSIDE inputs card */
+    .inputsGrid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr);
+      gap:10px;
+    }
+    @media (min-width:860px){
+      .inputsGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    }
+    .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
 
     /* Results */
     .resultsGrid{
@@ -146,18 +145,12 @@
     .calc-table td:first-child{ color:var(--muted); width:60%; }
     .calc-table td:last-child{ text-align:right; font-weight:900; }
 
-    .note{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.35; }
-
-    /* ---------- iOS-style picker modal ---------- */
+    /* iOS-style picker modal (mobile only) */
     .overlay{
-      position:fixed;
-      inset:0;
+      position:fixed; inset:0;
       background:rgba(0,0,0,.55);
-      display:flex;
-      align-items:flex-end;
-      justify-content:center;
-      z-index:1000;
-      padding:10px;
+      display:flex; align-items:flex-end; justify-content:center;
+      z-index:1000; padding:10px;
     }
     .hidden{ display:none; }
 
@@ -169,80 +162,50 @@
       box-shadow:0 18px 60px rgba(0,0,0,.55);
     }
     .pickerTop{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
+      display:flex; justify-content:space-between; align-items:center;
       padding:10px 12px;
       background:rgba(255,255,255,.06);
       color:#fff;
     }
-    .pickerTop .title{
-      font-weight:900;
-      font-size:14px;
-      opacity:.95;
-    }
+    .pickerTop .title{ font-weight:900; font-size:14px; opacity:.95; }
     .pickerTop button{
-      background:transparent;
-      color:#fff;
-      font-weight:900;
-      padding:8px 10px;
-      border-radius:12px;
+      background:transparent; color:#fff; font-weight:900;
+      padding:8px 10px; border-radius:12px;
     }
     .pickerTop button:hover{ background:rgba(255,255,255,.08); }
 
-    .wheelWrap{
-      position:relative;
-      height:240px;
-      background:linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.2) 30%, rgba(0,0,0,.2) 70%, rgba(0,0,0,.8));
-    }
-
+    .wheelWrap{ position:relative; height:240px; }
     .wheel{
       height:240px;
       overflow:auto;
       scroll-snap-type:y mandatory;
       -webkit-overflow-scrolling:touch;
-      padding:84px 0; /* centers selected row */
+      padding:84px 0;
+      background:linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.2) 30%, rgba(0,0,0,.2) 70%, rgba(0,0,0,.8));
     }
-
     .wheel::-webkit-scrollbar{ width:0; height:0; }
-
     .wheelItem{
       height:42px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      display:flex; align-items:center; justify-content:center;
       scroll-snap-align:center;
-      font-size:34px;
-      font-weight:800;
+      font-size:34px; font-weight:800;
       color:rgba(255,255,255,.38);
       user-select:none;
     }
-
-    /* highlight band */
     .selectorBand{
-      position:absolute;
-      left:12px;
-      right:12px;
-      top:50%;
-      transform:translateY(-50%);
-      height:52px;
-      border-radius:26px;
+      position:absolute; left:12px; right:12px;
+      top:50%; transform:translateY(-50%);
+      height:52px; border-radius:26px;
       background:rgba(255,255,255,.10);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
       pointer-events:none;
     }
-
-    /* the currently "nearest" item gets brighter (JS toggles .active) */
-    .wheelItem.active{
-      color:rgba(255,255,255,.95);
-    }
+    .wheelItem.active{ color:rgba(255,255,255,.95); }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>CMS Breakeven Calculator</h1>
-  </header>
+  <header><h1>CMS Breakeven Calculator</h1></header>
 
   <main>
     <div class="grid">
@@ -251,103 +214,93 @@
       <section class="card">
         <h2>Inputs</h2>
 
-        <div class="row">
-          <div class="field">
-            <label>In Date</label>
-            <input id="inDate" type="date" />
-          </div>
+        <div class="inputsGrid">
+          <!-- LEFT COLUMN (your order) -->
+          <div class="col">
+            <div class="field">
+              <label>In Date</label>
+              <input id="inDate" type="date" />
+            </div>
 
-          <!-- Year picker (for futures year reference) -->
-          <div class="field">
-            <label>Year</label>
-            <input id="pickYear" type="text" readonly />
-          </div>
+            <div class="field">
+              <label>Total Head</label>
+              <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
+            </div>
 
-          <!-- Interest rate wheel -->
-          <div class="field">
-            <label>Interest Rate (%)</label>
-            <input id="interestRatePct" type="text" readonly />
-          </div>
-
-          <div class="field">
-            <label>Total Head</label>
-            <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
-          </div>
-
-          <div class="field stack">
-            <div>
+            <div class="field">
               <label>Ownership (%)</label>
               <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
             </div>
-            <div>
-              <label>Head Owned (Total × Ownership)</label>
-              <input id="headOwned" type="text" readonly value="—" />
+
+            <div class="field">
+              <label>In Weight (lb)</label>
+              <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
+            </div>
+
+            <div class="field">
+              <label>Purchase Price ($/cwt)</label>
+              <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
+            </div>
+
+            <div class="field">
+              <label>Out Weight (lb)</label>
+              <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
+            </div>
+
+            <div class="field">
+              <label>Projected COG (no interest) ($/lb of gain)</label>
+              <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" />
+            </div>
+
+            <div class="field">
+              <label>Death Loss (%)</label>
+              <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" />
             </div>
           </div>
 
-          <div class="field">
-            <label>In Weight (lb)</label>
-            <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
-          </div>
-
-          <div class="field">
-            <label>Purchase Price ($/cwt)</label>
-            <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
-          </div>
-
-          <div class="field">
-            <label>Out Weight (lb)</label>
-            <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
-          </div>
-
-          <!-- COG wheel -->
-          <div class="field">
-            <label>Projected COG (no interest) ($/lb of gain)</label>
-            <input id="cogNoInterest" type="text" readonly />
-          </div>
-
-          <!-- DOF below COG + ADG beneath -->
-          <div class="field stack">
-            <div>
+          <!-- RIGHT COLUMN (your order) -->
+          <div class="col">
+            <div class="field">
               <label>Days on Feed</label>
               <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
             </div>
-            <div>
+
+            <div class="field">
               <label>ADG (lb/day)</label>
               <input id="adg" type="text" readonly value="—" />
             </div>
-          </div>
 
-          <!-- Death loss wheel -->
-          <div class="field">
-            <label>Death Loss (%)</label>
-            <input id="deathLossPct" type="text" readonly />
-          </div>
+            <div class="field">
+              <label>Out Date</label>
+              <input id="outDateInline" type="text" readonly value="—" />
+            </div>
 
-          <!-- Out Date moved ABOVE futures, like ADG -->
-          <div class="field">
-            <label>Out Date</label>
-            <input id="outDateInline" type="text" readonly value="—" />
-          </div>
+            <div class="field">
+              <label>Interest Rate (%)</label>
+              <input id="interestRatePct" type="number" step="0.5" min="0" max="25" inputmode="decimal" />
+            </div>
 
-          <div class="field">
-            <label>Futures ($/cwt)</label>
-            <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
-          </div>
+            <div class="field">
+              <label>Futures ($/cwt)</label>
+              <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
+            </div>
 
-          <!-- Basis wheel -->
-          <div class="field">
-            <label>Expected Basis ($/cwt)</label>
-            <input id="basis" type="text" readonly />
+            <div class="field">
+              <label>Expected Basis ($/cwt)</label>
+              <input id="basis" type="number" step="0.5" min="-100" max="100" inputmode="decimal" />
+            </div>
+
+            <div class="field">
+              <label>Head Owned (Total × Ownership)</label>
+              <input id="headOwned" type="text" readonly value="—" />
+            </div>
           </div>
         </div>
 
         <div class="actions">
           <button class="secondary" id="resetBtn">Reset</button>
         </div>
-
         <div class="error" id="errorText"></div>
-        <div class="note">Equity is fixed at <strong>30%</strong>. Pickers open when you tap the gray fields.</div>
       </section>
 
       <!-- RESULTS -->
@@ -355,7 +308,6 @@
         <h2>Results</h2>
 
         <div class="resultsGrid">
-          <!-- Reordered per your request -->
           <div class="metric" id="tilePlPerHd">
             <div class="k">P/L per head</div>
             <div class="v" id="plPerHd">—</div>
@@ -428,7 +380,7 @@
     </div>
   </main>
 
-  <!-- Picker Modal -->
+  <!-- Mobile Picker Modal -->
   <div id="pickerOverlay" class="overlay hidden" aria-hidden="true">
     <div class="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
       <div class="pickerTop">
@@ -436,7 +388,6 @@
         <div class="title" id="pickerTitle">Pick</div>
         <button id="pickerDone" type="button">Done</button>
       </div>
-
       <div class="wheelWrap">
         <div class="selectorBand"></div>
         <div id="pickerWheel" class="wheel"></div>
