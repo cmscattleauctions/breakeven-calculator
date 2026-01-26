@@ -5,37 +5,133 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
   <meta name="description" content="CMS Livestock Auction breakeven calculator" />
+
   <style>
-    :root { --cms:#336699; --bg:#f7f9fc; --card:#ffffff; --muted:#6b7280; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:#0f172a; }
+    :root {
+      --cms:#336699;
+      --bg:#f7f9fc;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --border:#dbe3ef;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:#0f172a;
+    }
+
     header { padding:18px 16px; background:var(--cms); color:#fff; }
-    header h1 { margin:0; font-size:18px; font-weight:800; }
+    header h1 { margin:0; font-size:18px; font-weight:900; }
     header p { margin:6px 0 0; font-size:13px; opacity:.95; line-height:1.35; }
-    main { max-width:980px; margin:0 auto; padding:16px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:14px; }
-    @media (min-width:900px){ .grid{ grid-template-columns: 1.1fr .9fr; } }
-    .card { background:var(--card); border-radius:14px; padding:14px; box-shadow:0 2px 10px rgba(15,23,42,.06); }
+
+    main {
+      max-width: 1040px;              /* better desktop sizing */
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns: minmax(0, 1fr); /* prevents overflow */
+      gap: 14px;
+      align-items: start;
+    }
+    @media (min-width: 980px) {
+      .grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
+    }
+
+    .card {
+      background:var(--card);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 2px 10px rgba(15,23,42,.06);
+      min-width: 0; /* critical for mobile overflow issues */
+    }
+
     .card h2 { margin:0 0 10px; font-size:15px; }
-    .row { display:grid; grid-template-columns: 1fr; gap:10px; }
-    @media (min-width:520px){ .row{ grid-template-columns: 1fr 1fr; } }
+
+    .row {
+      display:grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    @media (min-width:560px){
+      .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    }
+
+    .field { min-width: 0; }
     label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
-    input { width:100%; padding:10px 11px; border:1px solid #dbe3ef; border-radius:10px; font-size:15px; }
-    input:focus { outline: 2px solid rgba(51,102,153,.25); border-color:rgba(51,102,153,.45); }
+    input {
+      width:100%;
+      padding:10px 11px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      font-size:15px;
+      background:#fff;
+    }
+    input:focus {
+      outline: 2px solid rgba(51,102,153,.25);
+      border-color: rgba(51,102,153,.45);
+    }
+
     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-    button { border:0; border-radius:12px; padding:11px 14px; font-weight:800; cursor:pointer; font-size:14px; }
+    button {
+      border:0;
+      border-radius:12px;
+      padding:11px 14px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:14px;
+    }
     .primary { background:var(--cms); color:#fff; }
     .secondary { background:#e8eef7; color:#0f172a; }
+
     .error { margin-top:10px; color:#b91c1c; font-size:13px; }
-    .metric { padding:10px 12px; border:1px solid #e5eaf3; border-radius:12px; margin-top:10px; }
+
+    .metric {
+      padding:10px 12px;
+      border:1px solid #e5eaf3;
+      border-radius:12px;
+      margin-top:10px;
+    }
     .metric .k { font-size:12px; color:var(--muted); }
     .metric .v { font-size:20px; font-weight:900; margin-top:2px; }
-    .small { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.35; }
+
+    details { margin-top: 12px; }
+    summary {
+      cursor: pointer;
+      font-weight: 800;
+      color:#0f172a;
+      padding: 8px 0;
+    }
+
+    .calc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 13px;
+    }
+    .calc-table td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #eef2f7;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .calc-table td:first-child { color: var(--muted); width: 55%; }
+    .calc-table td:last-child { text-align: right; font-weight: 800; }
+
+    .note { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.35; }
   </style>
 </head>
+
 <body>
   <header>
     <h1>CMS Breakeven Calculator</h1>
-    <p>Enter your inputs, tap Calculate, and review break-even and projected P/L.</p>
+    <p>Enter inputs, and your Out Date will appear immediately. Full break-even and P/L calculate when all required fields are filled.</p>
   </header>
 
   <main>
@@ -44,47 +140,53 @@
         <h2>Inputs</h2>
 
         <div class="row">
-          <div>
+          <div class="field">
             <label>In Date</label>
             <input id="inDate" type="date" />
           </div>
-          <div>
+
+          <div class="field">
             <label>Days on Feed</label>
             <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
           </div>
 
-          <div>
-            <label>Interest Rate (annual, decimal)</label>
-            <input id="interestRate" type="number" step="0.0001" inputmode="decimal" placeholder="e.g., 0.0725" />
-          </div>
-          <div>
-            <label>Death Loss % (decimal)</label>
-            <input id="deathLossPct" type="number" step="0.0001" inputmode="decimal" placeholder="e.g., 0.01" />
+          <div class="field">
+            <label>Interest Rate (%)</label>
+            <input id="interestRatePct" type="number" step="0.01" inputmode="decimal" placeholder="7.25" />
           </div>
 
-          <div>
+          <div class="field">
+            <label>Death Loss (%)</label>
+            <input id="deathLossPct" type="number" step="0.01" inputmode="decimal" placeholder="1.00" />
+          </div>
+
+          <div class="field">
             <label>In Weight (lb)</label>
             <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
           </div>
-          <div>
+
+          <!-- Purchase price moved ABOVE Out Weight -->
+          <div class="field">
+            <label>Purchase Price ($/cwt)</label>
+            <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
+          </div>
+
+          <div class="field">
             <label>Out Weight (lb)</label>
             <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
           </div>
 
-          <div>
-            <label>Purchase Price ($/cwt)</label>
-            <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
-          </div>
-          <div>
+          <div class="field">
             <label>Projected COG (no interest) ($/lb of gain)</label>
             <input id="cogNoInterest" type="number" step="0.0001" inputmode="decimal" placeholder="e.g., 1.10" />
           </div>
 
-          <div>
+          <div class="field">
             <label>Futures ($/cwt)</label>
             <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
           </div>
-          <div>
+
+          <div class="field">
             <label>Expected Basis ($/cwt)</label>
             <input id="basis" type="number" inputmode="decimal" placeholder="e.g., -3" />
           </div>
@@ -97,14 +199,20 @@
 
         <div class="error" id="errorText"></div>
 
-        <div class="small">
-          Note: Purchase price is entered in <strong>$/cwt</strong> because the original sheet calculates
-          Cost/hd as <code>InWeight × Price ÷ 100</code>.
+        <div class="note">
+          Purchase price is in <strong>$/cwt</strong> (your original sheet uses <code>InWeight × Price ÷ 100</code>).
+          Interest and death loss are entered as <strong>percent</strong> (e.g., 7.25, 1.0).
         </div>
       </section>
 
       <section class="card">
         <h2>Results</h2>
+
+        <!-- Out Date is shown even before futures are entered -->
+        <div class="metric">
+          <div class="k">Out Date</div>
+          <div class="v" id="outDate">—</div>
+        </div>
 
         <div class="metric">
           <div class="k">Break-even</div>
@@ -126,12 +234,19 @@
           <div class="v" id="plPerHd">—</div>
         </div>
 
-        <div class="metric">
-          <div class="k">Out Date</div>
-          <div class="v" id="outDate">—</div>
-        </div>
-
-        <div class="small" id="details"></div>
+        <details>
+          <summary>Calculation Details (per head)</summary>
+          <table class="calc-table">
+            <tbody>
+              <tr><td>Purchase cost / hd</td><td id="d_costPerHd">—</td></tr>
+              <tr><td>Dead loss ($/hd)</td><td id="d_deadLossDollars">—</td></tr>
+              <tr><td>Feed cost / hd</td><td id="d_feedCost">—</td></tr>
+              <tr><td>COG incl deads / hd</td><td id="d_perHdCOG">—</td></tr>
+              <tr><td>Interest / hd</td><td id="d_interestPerHd">—</td></tr>
+              <tr><td>Total cost / hd (purchase + COG + interest)</td><td id="d_totalCostPerHd">—</td></tr>
+            </tbody>
+          </table>
+        </details>
       </section>
     </div>
   </main>
