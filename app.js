@@ -15,6 +15,11 @@
   function moneyPerHd(x) { return isFinite(x) ? `${money(x)} /hd` : "—"; }
   function pct(x) { return isFinite(x) ? (x * 100).toFixed(2) + "%" : "—"; }
 
+  function fmtNum(x, decimals = 2) {
+    if (!isFinite(x)) return "—";
+    return Number(x).toFixed(decimals);
+  }
+
   // Parsing
   function numOrNaN(id) {
     const raw = String($(id)?.value ?? "").trim();
@@ -68,6 +73,11 @@
     setText("d_equityBase", "—");
   }
 
+  function resetADG() {
+    const el = $("adg");
+    if (el) el.value = "—";
+  }
+
   // Two-cashflow IRR (closed form)
   function irrTwoPoint(c0, c1, d0, d1) {
     const msPerDay = 24 * 60 * 60 * 1000;
@@ -94,12 +104,30 @@
     return null;
   }
 
+  // ADG: (outWeight - inWeight) / daysOnFeed
+  function updateADGOnly() {
+    const daysOnFeed = numOrNaN("daysOnFeed");
+    const inWeight = numOrNaN("inWeight");
+    const outWeight = numOrNaN("outWeight");
+
+    const adgEl = $("adg");
+    if (!adgEl) return;
+
+    if (isFinite(daysOnFeed) && daysOnFeed > 0 && isFinite(inWeight) && isFinite(outWeight) && outWeight > inWeight) {
+      const adg = (outWeight - inWeight) / daysOnFeed;
+      adgEl.value = fmtNum(adg, 2);
+    } else {
+      adgEl.value = "—";
+    }
+  }
+
   function updateAll() {
     clearError();
 
-    // Priority: Out Date first
+    // Priority: Out Date + ADG first
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateOnly();
+    updateADGOnly();
 
     // Inputs (percent fields)
     const daysOnFeed = numOrNaN("daysOnFeed");
@@ -273,6 +301,7 @@
     if ($("equityPct")) $("equityPct").value = "30";
 
     clearError();
+    resetADG();
     resetCoreOutputs();
     resetTotalsOutputs();
     updateOutDateOnly();
