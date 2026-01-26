@@ -14,6 +14,7 @@
       --muted:#6b7280;
       --border:#dbe3ef;
       --soft:#eef2f7;
+      --disabled:#f2f4f8;
     }
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
@@ -84,6 +85,12 @@
       outline:2px solid rgba(51,102,153,.25);
       border-color:rgba(51,102,153,.45);
     }
+    input[readonly]{
+      background:var(--disabled);
+      color:#111827;
+    }
+
+    .stack{ display:flex; flex-direction:column; gap:10px; }
 
     .actions{
       display:flex;
@@ -171,7 +178,7 @@
     <h1>CMS Breakeven Calculator</h1>
     <p>
       Auto-calculates as you type. <span class="pill">Out Date</span> appears immediately once In Date + Days on Feed are entered.
-      Break-even computes when cost inputs exist; totals/ROE/IRR compute once sale price + head/ownership exist.
+      <span class="pill">ADG</span> appears as soon as In Weight + Out Weight + Days on Feed are entered.
     </p>
   </header>
 
@@ -188,9 +195,17 @@
             <input id="inDate" type="date" />
           </div>
 
-          <div class="field">
-            <label>Days on Feed</label>
-            <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
+          <!-- Stack Days on Feed + ADG in the same grid cell on desktop -->
+          <div class="field stack">
+            <div>
+              <label>Days on Feed</label>
+              <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
+            </div>
+
+            <div>
+              <label>ADG (lb/day)</label>
+              <input id="adg" type="text" readonly value="—" />
+            </div>
           </div>
 
           <div class="field">
@@ -223,7 +238,6 @@
             <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
           </div>
 
-          <!-- Purchase price ABOVE Out Weight -->
           <div class="field">
             <label>Purchase Price ($/cwt)</label>
             <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
@@ -347,7 +361,7 @@
           </table>
           <div class="note">
             ROE assumes you finance the remainder and only tie up the Equity Used % of capital (default 30%).
-            IRR is computed using one cash outflow at In Date (capital invested) and one inflow at Out Date (cattle sales).
+            IRR uses one cash outflow at In Date (capital invested) and one inflow at Out Date (cattle sales).
           </div>
         </details>
       </section>
