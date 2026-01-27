@@ -93,7 +93,7 @@
   function updateHeadOwnedTip(){
     const tipWrap = $("wrapHeadOwnedTip");
     const tipVal = $("headOwnedTip");
-    if (!tipWrap || !tipVal) return;
+    if (!tipWrap || !tipVal) return NaN;
 
     if (quickRun) {
       tipWrap.classList.add("hidden");
@@ -133,41 +133,32 @@
     return {
       contracts: n,
       kind: isFeeder ? "Feeder Cattle" : "Live Cattle",
-      denomLb: denom
+      denomLb: denom,
+      isFeeder
     };
   }
 
-  function renderContractsUI(info, myHead, outWeightLb) {
+  function renderContractsUI(info, outWeightLb) {
     const tile = $("tileContractsNeeded");
     const val = $("contractsNeeded");
     const label = $("contractsLabel");
-    const line = $("contractsInfoLine");
     const tip = $("contractsTooltip");
     const basisCell = $("d_contractsBasis");
 
     if (!tile || !val || !label) return;
 
-    // Only in Quick Run OFF mode
+    // Only in Full mode
     const show = !quickRun;
-
     tile.classList.toggle("hidden", !show);
-    line?.classList.toggle("hidden", !show);
 
-    if (!show) {
+    if (!show || !info) {
       val.textContent = "—";
       label.textContent = "Contracts Needed";
       basisCell && (basisCell.textContent = "—");
       return;
     }
 
-    if (!info) {
-      val.textContent = "—";
-      label.textContent = "Contracts Needed";
-      basisCell && (basisCell.textContent = "—");
-      return;
-    }
-
-    // Round to 2 decimals (you can change later to always round up)
+    // Display with 2 decimals
     const shown = info.contracts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     label.textContent = `${info.kind} Contracts Needed`;
     val.textContent = shown;
@@ -178,10 +169,6 @@
       `Formula: (Head Owned × Out Weight) ÷ ${info.denomLb.toLocaleString()} lb per contract.`;
 
     if (tip) tip.textContent = msg;
-    if (line) {
-      const t = $("contractsInfoText");
-      if (t) t.textContent = msg;
-    }
     if (basisCell) basisCell.textContent = msg;
   }
 
@@ -200,9 +187,7 @@
     // Head owned tooltip hidden in quick run
     $("wrapHeadOwnedTip")?.classList.toggle("hidden", quickRun);
 
-    // Results visibility:
-    // Quick Run shows: PL/hd, PL/cwt, BE, Sales price
-    // Full mode shows everything incl contracts + totals
+    // Results visibility
     const hide = (id, shouldHide) => { const el = $(id); if (el) el.classList.toggle("hidden", shouldHide); };
 
     hide("tileTotalPL", quickRun);
@@ -212,6 +197,9 @@
     hide("tileAnnualRoe", quickRun);
     hide("tileIrr", quickRun);
     $("detailsPanel")?.classList.toggle("hidden", quickRun);
+
+    // Contracts tile hidden by renderContractsUI as well; keep consistent:
+    $("tileContractsNeeded")?.classList.toggle("hidden", quickRun);
   }
 
   // ===================== Outputs reset =====================
@@ -236,7 +224,6 @@
   }
 
   // ===================== Main calc =====================
-  // Returns a “calc snapshot” used for PDF + share.
   function updateAll(){
     clearError();
 
@@ -273,13 +260,13 @@
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
       softError("Days on Feed must be > 0.");
       resetOutputs(); applyStatus(NaN);
-      renderContractsUI(null, NaN, NaN);
+      renderContractsUI(null, outWeight);
       return null;
     }
     if (isFinite(inWeight) && isFinite(outWeight) && inWeight > 0 && outWeight > 0 && outWeight <= inWeight) {
       softError("Out Weight must be greater than In Weight.");
       resetOutputs(); applyStatus(NaN);
-      renderContractsUI(null, NaN, NaN);
+      renderContractsUI(null, outWeight);
       return null;
     }
 
@@ -296,7 +283,7 @@
       resetOutputs();
       if (isFinite(futures) && isFinite(basis)) setText("salesPrice", moneyPerCwt(futures + basis));
       applyStatus(NaN);
-      renderContractsUI(null, myHeadFromTip, outWeight);
+      renderContractsUI(null, outWeight);
       return null;
     }
 
@@ -338,7 +325,7 @@
       setText("d_equityBase","—");
 
       applyStatus(NaN);
-      renderContractsUI(null, myHeadFromTip, outWeight);
+      renderContractsUI(null, outWeight);
       return null;
     }
 
@@ -364,7 +351,7 @@
       setText("d_equityBase","—");
       setText("contractsNeeded","—");
       setText("d_contractsBasis","—");
-      renderContractsUI(null, NaN, outWeight);
+      renderContractsUI(null, outWeight);
       applyStatus(plPerHd);
       return null;
     }
@@ -379,8 +366,7 @@
       setText("annualRoe","—");
       setText("irr","—");
       setText("d_equityBase","—");
-
-      renderContractsUI(null, myHeadFromTip, outWeight);
+      renderContractsUI(null, outWeight);
       applyStatus(plPerHd);
       return null;
     }
@@ -415,7 +401,7 @@
 
     // Contracts needed (full mode only)
     const cInfo = computeContractsNeeded(myHead, outWeight);
-    renderContractsUI(cInfo, myHead, outWeight);
+    renderContractsUI(cInfo, outWeight);
 
     applyStatus(plPerHd);
 
@@ -622,12 +608,11 @@
     }
   }
 
-  // ===================== PDF (reordered per new spec) =====================
+  // ===================== PDF (tweaked per latest request) =====================
   function sanitizeFilename(name) {
     return String(name).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   }
 
-  // Helper to draw rounded rect
   function rrect(doc, x,y,w,h,r, fillRGB, strokeRGB){
     if (strokeRGB) doc.setDrawColor(strokeRGB[0],strokeRGB[1],strokeRGB[2]);
     if (fillRGB) doc.setFillColor(fillRGB[0],fillRGB[1],fillRGB[2]);
@@ -635,7 +620,8 @@
   }
 
   function downloadPdf() {
-    const calc = updateAll(); // refresh + get snapshot (may be null if incomplete)
+    updateAll(); // refresh UI first
+
     const scenario = prompt("Scenario name for this PDF?");
     if (scenario === null) return;
 
@@ -648,7 +634,6 @@
       return;
     }
 
-    // Pull core values from UI text (already formatted)
     const inDate = parseDateOrNull("inDate");
     const outDate = (inDate && isFinite(numOrNaN("daysOnFeed")) && numOrNaN("daysOnFeed") > 0)
       ? addDays(inDate, numOrNaN("daysOnFeed"))
@@ -690,7 +675,7 @@
 
     // ----- PDF drawing -----
     const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const W = 612, H = 792;
+    const W = 612;
     const margin = 42;
 
     const cmsBlue = [51, 102, 153];
@@ -743,12 +728,12 @@
     doc.setFont("helvetica", "bold"); tc(ink);
     doc.text(String(v_headOwned), rightX + 66, y);
 
-    // Results snapshot: Left card = Profitability; Right card = Contracts + Total PL on same line
+    // Snapshot cards
     y += 18;
 
     const cardGap = 12;
     const cardW = (W - margin*2 - cardGap) / 2;
-    const cardH = 124;
+    const cardH = 132;
     const cardY = y;
     const c1x = margin;
     const c2x = margin + cardW + cardGap;
@@ -756,7 +741,7 @@
     rrect(doc, c1x, cardY, cardW, cardH, 12, white, border);
     rrect(doc, c2x, cardY, cardW, cardH, 12, white, border);
 
-    // Left: PL per head + (optionally) PL/cwt
+    // Left: PL per head big + PL/cwt
     doc.setFont("helvetica", "bold"); doc.setFontSize(28); tc(ink);
     doc.text(v_plHd.replace(" /hd",""), c1x + 14, cardY + 44);
 
@@ -769,25 +754,29 @@
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text("NET MARGIN / CWT", c1x + 14, cardY + 110);
 
-    // Right: Contracts needed + Total PL on same line (below)
+    // Right: Contracts + Total PL (Total PL styled like PL per head)
+    const rightTopY = cardY + 26;
+
+    // Contracts value (smaller than Total PL now)
     doc.setFont("helvetica","bold"); doc.setFontSize(16); tc(ink);
-    doc.text(quickRun ? "—" : v_contractsVal, c2x + 14, cardY + 38);
+    doc.text(quickRun ? "—" : v_contractsVal, c2x + 14, rightTopY);
 
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text(quickRun ? "CONTRACTS NEEDED" : v_contractsLabel.toUpperCase(), c2x + 14, cardY + 54);
+    doc.text(quickRun ? "CONTRACTS NEEDED" : v_contractsLabel.toUpperCase(), c2x + 14, rightTopY + 16);
 
-    // Tooltip text (small)
-    doc.setFont("helvetica","normal"); doc.setFontSize(9); tc(muted);
+    // Total PL big (same feel as PL per head)
+    doc.setFont("helvetica","bold"); doc.setFontSize(28); tc(ink);
+    doc.text(quickRun ? "—" : String(v_totalPL), c2x + 14, cardY + 82);
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
+    doc.text("TOTAL P/L", c2x + 14, cardY + 100);
+
+    // Tooltip moved BELOW Total PL and made smaller
+    doc.setFont("helvetica","normal"); doc.setFontSize(8); tc(muted);
     const tipText = quickRun
       ? "Contracts estimate shown only in Full mode."
-      : v_contractsTip || "Based on Head Owned. Uses Feeder under 1,000 lb; Live at/over 1,000 lb.";
-    doc.text(doc.splitTextToSize(tipText, cardW - 28), c2x + 14, cardY + 70);
-
-    // Total PL on same line area near bottom of right card
-    doc.setFont("helvetica","bold"); doc.setFontSize(14); tc(muted);
-    doc.text("TOTAL P/L", c2x + 14, cardY + 108);
-    doc.setFont("helvetica","bold"); doc.setFontSize(16); tc(ink);
-    doc.text(quickRun ? "—" : v_totalPL, c2x + cardW - 14, cardY + 108, { align:"right" });
+      : (v_contractsTip || "Based on Head Owned. Uses Feeder under 1,000 lb; Live at/over 1,000 lb.");
+    doc.text(doc.splitTextToSize(tipText, cardW - 28), c2x + 14, cardY + 114);
 
     y = cardY + cardH + 14;
 
@@ -885,7 +874,7 @@
 
     y += 60;
 
-    // Move Break-even + Projected sale BELOW inputs (per request)
+    // Break-even + Projected sale BELOW inputs
     rrect(doc, margin, y, W - margin*2, 56, 12, white, border);
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text("Break-even:", margin + 14, y + 22);
@@ -942,7 +931,7 @@
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
 
-    // Basis: FULL dollar increments now (step=1)
+    // Basis: FULL dollar increments
     const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 1.0, decimals: 0 });
 
     attachMobilePicker("interestRatePct", { title:"Interest Rate (%)", values: irVals, defaultValue: 7.25 });
