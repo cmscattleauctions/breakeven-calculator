@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
 
-  <!-- jsPDF will be used by app.js (we’ll wire the PDF layout + logic in the next response) -->
+  <!-- jsPDF will be used by app.js (we’ll update PDF logic in the next response) -->
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
@@ -18,7 +18,6 @@
       --soft:#eef2f7;
       --disabled:#f2f4f8;
 
-      /* Results panel background */
       --results-bg:#eaf2ff;
 
       --good-bg:#ecfdf5; --good-bd:#10b981; --good-tx:#065f46;
@@ -132,7 +131,6 @@
       outline:2px solid rgba(51,102,153,.25);
       border-color:rgba(51,102,153,.45);
     }
-    /* Only formula fields are grey */
     input[readonly]{
       background:var(--disabled);
       color:#111827;
@@ -153,16 +151,17 @@
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
     .field{ min-width:0; }
 
-    /* Ownership + Head Owned tooltip */
+    /* Tooltip lines */
     .withTip{ position:relative; }
     .tipLine{
       margin-top:6px;
       font-size:12px;
       color:var(--muted);
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       gap:6px;
       user-select:none;
+      line-height:1.25;
     }
     .tipBadge{
       width:18px; height:18px;
@@ -176,6 +175,7 @@
       color:#0f172a;
       border:1px solid rgba(15,23,42,.10);
       flex:0 0 auto;
+      margin-top:1px;
     }
     .tipValue{ font-weight:900; color:#0f172a; }
 
@@ -198,12 +198,24 @@
     }
     .metric .k{ font-size:12px; color:var(--muted); }
     .metric .v{ font-size:18px; font-weight:900; margin-top:2px; }
+    .metric.small .metric .v{ font-size:15px; }
     .metric.small .v{ font-size:15px; font-weight:900; }
 
     .metric.good{ background:var(--good-bg); border-color:var(--good-bd); color:var(--good-tx); }
     .metric.mid{  background:var(--mid-bg);  border-color:var(--mid-bd);  color:var(--mid-tx); }
     .metric.bad{  background:var(--bad-bg);  border-color:var(--bad-bd);  color:var(--bad-tx); }
     .metric.good .k, .metric.mid .k, .metric.bad .k{ color:inherit; opacity:.85; }
+
+    /* Result block with inline tooltip text (contracts) */
+    .metricFoot{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:6px;
+      line-height:1.25;
+      align-items:flex-start;
+    }
 
     details{ margin-top:10px; }
     summary{ cursor:pointer; font-weight:900; padding:6px 0; color:#0f172a; }
@@ -283,9 +295,7 @@
     }
     .wheelItem.active{ color:rgba(255,255,255,.95); }
 
-    /* ---------- PDF template container (hidden) ----------
-       app.js will use this structure to generate the executive one-page layout you specified.
-    */
+    /* Hidden PDF template container — logic lives in app.js */
     .pdfTemplate{ display:none; }
   </style>
 </head>
@@ -303,7 +313,6 @@
         <div class="cardHeader">
           <h2>Inputs</h2>
           <div class="headerActions">
-            <!-- Quick Run toggle moved next to Inputs title -->
             <button id="quickRunBtn" class="pillToggle" type="button" data-on="false">Quick Run: OFF</button>
           </div>
         </div>
@@ -316,13 +325,11 @@
               <input id="inDate" type="date" />
             </div>
 
-            <!-- Hidden on Quick Run -->
             <div class="field" id="wrapTotalHead">
               <label>Total Head</label>
               <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
             </div>
 
-            <!-- Hidden on Quick Run -->
             <div class="field withTip" id="wrapOwnershipPct">
               <label>Ownership (%)</label>
               <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
@@ -377,10 +384,8 @@
               <input id="outDateInline" type="text" readonly value="—" />
             </div>
 
-            <!-- Interest stays available in Quick Run (reworked back in) -->
             <div class="field" id="wrapInterestRate">
               <label>Interest Rate (%)</label>
-              <!-- Base 7.25, increments 0.05 (wired in JS) -->
               <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
             </div>
 
@@ -391,10 +396,9 @@
 
             <div class="field">
               <label>Expected Basis ($/cwt)</label>
-              <input id="basis" type="number" step="0.5" min="-100" max="100" inputmode="decimal" />
+              <!-- NOTE: basis picker will move in FULL $ increments (step=1). JS picker list updated next. -->
+              <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" />
             </div>
-
-            <!-- Full head-owned field removed (replaced by tooltip under Ownership) -->
           </div>
         </div>
 
@@ -409,15 +413,20 @@
         <div class="cardHeader">
           <h2>Results</h2>
           <div class="headerActions">
-            <!-- Download PDF moved next to Results title -->
             <button id="downloadPdfBtn" class="primary" type="button">Download PDF</button>
-            <!-- Optional: share button (logic in JS later) -->
             <button id="shareScenarioBtn" type="button">Share Scenario</button>
           </div>
         </div>
 
+        <!-- Contracts tooltip (visible only when Quick Run OFF; JS will toggle) -->
+        <div class="tipLine hidden" id="contractsInfoLine" style="margin-top:-2px;margin-bottom:10px;">
+          <span class="tipBadge">i</span>
+          <span id="contractsInfoText">
+            Contracts needed are based on Head Owned (not the full lot). Uses Feeder under 1,000 lb and Live at/over 1,000 lb.
+          </span>
+        </div>
+
         <div class="resultsGrid" id="resultsGrid">
-          <!-- Always visible -->
           <div class="metric" id="tilePlPerHd">
             <div class="k">P/L per head</div>
             <div class="v" id="plPerHd">—</div>
@@ -428,7 +437,6 @@
             <div class="v" id="plPerCwt">—</div>
           </div>
 
-          <!-- Quick Run: add Break-even + Sales Price (so keep them available) -->
           <div class="metric small" id="tileBreakEven">
             <div class="k">Break-even</div>
             <div class="v" id="breakEvenCwt">—</div>
@@ -439,7 +447,19 @@
             <div class="v" id="salesPrice">—</div>
           </div>
 
-          <!-- Full mode only -->
+          <!-- New: Contracts needed (Quick Run OFF only) -->
+          <div class="metric" id="tileContractsNeeded">
+            <div class="k" id="contractsLabel">Contracts Needed</div>
+            <div class="v" id="contractsNeeded">—</div>
+            <div class="metricFoot">
+              <span class="tipBadge">i</span>
+              <span id="contractsTooltip">
+                Based on Head Owned, not the full lot. Uses Feeder under 1,000 lb and Live at/over 1,000 lb.
+              </span>
+            </div>
+          </div>
+
+          <!-- Projected Total P/L will be moved on PDF per your spec (JS update next), but stays here for full mode -->
           <div class="metric" id="tileTotalPL">
             <div class="k">Projected Total P/L</div>
             <div class="v" id="projectedTotalPL">—</div>
@@ -484,6 +504,7 @@
               <tr><td>Total cost / hd</td><td id="d_totalCostPerHd">—</td></tr>
               <tr><td>Cattle sales / hd</td><td id="d_salesPerHd">—</td></tr>
               <tr><td>Equity base (Capital × 30%)</td><td id="d_equityBase">—</td></tr>
+              <tr><td>Contracts needed (calc basis)</td><td id="d_contractsBasis">—</td></tr>
             </tbody>
           </table>
         </details>
@@ -507,119 +528,18 @@
     </div>
   </div>
 
-  <!-- Hidden “PDF executive layout” template (JS will render to PDF to match your spec) -->
+  <!-- Hidden PDF template container (structure only; app.js will generate the new PDF ordering) -->
   <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true">
-    <!-- 1) Header -->
-    <div id="pdfHeader">
-      <div id="pdfHeaderBar" style="height:32px;background:var(--cms);"></div>
-      <div style="padding:14px 16px;">
-        <div style="font-weight:900;font-size:18px;">CMS Breakeven Calculator</div>
-        <div style="margin-top:2px;color:var(--muted);font-size:12px;font-weight:900;">Lot Economics Summary</div>
-
-        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;color:var(--muted);font-size:12px;">
-          <div>In Date: <span id="pdf_inDate" style="color:#0f172a;font-weight:900;">—</span></div>
-          <div>Out Date: <span id="pdf_outDate" style="color:#0f172a;font-weight:900;">—</span></div>
-          <div>Days on Feed: <span id="pdf_dof" style="color:#0f172a;font-weight:900;">—</span></div>
-          <div>Head Owned: <span id="pdf_headOwned" style="color:#0f172a;font-weight:900;">—</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2) Results Snapshot -->
-    <div id="pdfSnapshot" style="padding:0 16px 12px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
-          <div style="font-size:28px;font-weight:900;" id="pdf_plPerHead">—</div>
-          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">P/L PER HEAD</div>
-
-          <div style="height:10px;"></div>
-
-          <div style="font-size:22px;font-weight:900;" id="pdf_totalPL">—</div>
-          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">TOTAL P/L</div>
-        </div>
-
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
-          <div style="font-size:22px;font-weight:900;" id="pdf_breakEven">—</div>
-          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">BREAK-EVEN</div>
-
-          <div style="height:10px;"></div>
-
-          <div style="font-size:22px;font-weight:900;" id="pdf_salePrice">—</div>
-          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">PROJECTED SALE</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3) Performance Metrics Row -->
-    <div id="pdfPerfRow" style="padding:0 16px 12px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
-          <div style="color:var(--muted);font-size:11px;font-weight:900;">ROE</div>
-          <div style="font-size:16px;font-weight:900;" id="pdf_roe">—</div>
-        </div>
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
-          <div style="color:var(--muted);font-size:11px;font-weight:900;">ANNUALIZED ROE</div>
-          <div style="font-size:16px;font-weight:900;" id="pdf_aroe">—</div>
-        </div>
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
-          <div style="color:var(--muted);font-size:11px;font-weight:900;">IRR</div>
-          <div style="font-size:16px;font-weight:900;" id="pdf_irr">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4) Cost & Capital Summary -->
-    <div id="pdfCostCapital" style="padding:0 16px 12px;">
-      <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;font-size:12px;">
-          <div style="color:var(--muted);font-weight:900;">Capital Invested:</div>
-          <div style="text-align:right;font-weight:900;" id="pdf_capital">—</div>
-
-          <div style="color:var(--muted);font-weight:900;">Cattle Sales:</div>
-          <div style="text-align:right;font-weight:900;" id="pdf_sales">—</div>
-
-          <div style="color:var(--muted);font-weight:900;">Net Margin / cwt:</div>
-          <div style="text-align:right;font-weight:900;" id="pdf_marginCwt">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5) Inputs (de-emphasized) -->
-    <div id="pdfInputs" style="padding:0 16px 16px;">
-      <div style="color:var(--muted);font-size:12px;font-weight:900;margin-bottom:8px;">Inputs</div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;">
-          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Weights &amp; Performance</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);">
-            <div>In Weight:</div><div style="font-weight:900;color:#0f172a;" id="pdf_inWt">—</div>
-            <div>Out Weight:</div><div style="font-weight:900;color:#0f172a;" id="pdf_outWt">—</div>
-            <div>ADG:</div><div style="font-weight:900;color:#0f172a;" id="pdf_adg">—</div>
-            <div>Death Loss:</div><div style="font-weight:900;color:#0f172a;" id="pdf_dl">—</div>
-          </div>
-        </div>
-
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;">
-          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Pricing Assumptions</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);">
-            <div>Purchase:</div><div style="font-weight:900;color:#0f172a;" id="pdf_purchase">—</div>
-            <div>COG:</div><div style="font-weight:900;color:#0f172a;" id="pdf_cog">—</div>
-            <div>Futures:</div><div style="font-weight:900;color:#0f172a;" id="pdf_fut">—</div>
-            <div>Basis:</div><div style="font-weight:900;color:#0f172a;" id="pdf_basis">—</div>
-          </div>
-        </div>
-
-        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;grid-column:1 / -1;">
-          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Financing</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);max-width:320px;">
-            <div>Interest Rate:</div><div style="font-weight:900;color:#0f172a;" id="pdf_ir">—</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- NOTE: You asked to reorder PDF and make Scenario Name the main title.
+         We will implement that in app.js:
+         - Scenario name as Title
+         - Contracts needed (with tooltips) in the snapshot area where BE/Sale were
+         - Move Break-even + Projected sale down below inputs
+         - Place Projected Total P/L on same line as contracts area per spec
+    -->
+    <div id="pdfScenarioName">—</div>
   </section>
 
-  <!-- app.js will be provided/updated in the next response -->
   <script src="./app.js"></script>
 </body>
 </html>
