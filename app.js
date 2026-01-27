@@ -2,10 +2,10 @@
   const $ = (id) => document.getElementById(id);
   const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
 
-  // ====== State ======
+  // ===================== State =====================
   let quickRun = false;
 
-  // ====== Format helpers ======
+  // ===================== Formatting =====================
   function money(x) {
     if (!isFinite(x)) return "—";
     return "$" + x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,12 +15,18 @@
   const pct         = (x) => isFinite(x) ? (x * 100).toFixed(2) + "%" : "—";
   const fmtNum      = (x, d=2) => isFinite(x) ? Number(x).toFixed(d) : "—";
 
-  // ====== Parse helpers ======
+  // For PDF: currency w/out label
+  const moneyPlain = (x) => isFinite(x) ? money(x) : "—";
+
+  // ===================== Parsing =====================
   function numOrNaN(id) {
     const raw = String($(id)?.value ?? "").trim();
     if (raw === "") return NaN;
     const v = Number(raw);
     return isFinite(v) ? v : NaN;
+  }
+  function strOrEmpty(id) {
+    return String($(id)?.value ?? "").trim();
   }
   function parseDateOrNull(id) {
     const s = String($(id)?.value || "").trim();
@@ -33,11 +39,18 @@
     out.setDate(out.getDate() + Number(days));
     return out;
   }
+  function dateToISO(d){
+    if (!d || isNaN(d.getTime())) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
 
   function clearError(){ setText("errorText",""); }
   function softError(msg){ setText("errorText", msg || ""); }
 
-  // ====== Status coloring ======
+  // ===================== Status coloring =====================
   function applyStatus(plPerHd){
     const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
     tiles.forEach(t => t.classList.remove("good","mid","bad"));
@@ -46,23 +59,7 @@
     tiles.forEach(t => t.classList.add(cls));
   }
 
-  // ====== Derived displays ======
-  function updateHeadOwned(){
-    const totalHead = numOrNaN("totalHead");
-    const ownershipPct = numOrNaN("ownershipPct");
-    const el = $("headOwned");
-    if (!el) return;
-
-    if (!quickRun && isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct >= 0) {
-      const myHead = totalHead * (ownershipPct / 100.0);
-      el.value = myHead.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      setText("d_myHead", el.value);
-    } else {
-      el.value = "—";
-      setText("d_myHead", "—");
-    }
-  }
-
+  // ===================== Derived fields =====================
   function updateADG(){
     const daysOnFeed = numOrNaN("daysOnFeed");
     const inWeight = numOrNaN("inWeight");
@@ -92,16 +89,74 @@
     return null;
   }
 
-  // ====== Outputs reset ======
+  function updateHeadOwnedTip(){
+    const tipWrap = $("wrapHeadOwnedTip");
+    const tipVal = $("headOwnedTip");
+    if (!tipWrap || !tipVal) return;
+
+    if (quickRun) {
+      tipWrap.classList.add("hidden");
+      tipVal.textContent = "—";
+      setText("d_myHead", "—");
+      return;
+    }
+
+    tipWrap.classList.remove("hidden");
+
+    const totalHead = numOrNaN("totalHead");
+    const ownershipPct = numOrNaN("ownershipPct");
+
+    if (isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct >= 0) {
+      const myHead = totalHead * (ownershipPct / 100.0);
+      const txt = myHead.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      tipVal.textContent = txt;
+      setText("d_myHead", txt);
+    } else {
+      tipVal.textContent = "—";
+      setText("d_myHead", "—");
+    }
+  }
+
+  // ===================== UI toggles =====================
+  function applyQuickRunUI(){
+    const btn = $("quickRunBtn");
+    if (btn) {
+      btn.textContent = `Quick Run: ${quickRun ? "ON" : "OFF"}`;
+      btn.setAttribute("data-on", quickRun ? "true" : "false");
+    }
+
+    // Hide inputs (interest stays visible in BOTH modes)
+    $("wrapTotalHead")?.classList.toggle("hidden", quickRun);
+    $("wrapOwnershipPct")?.classList.toggle("hidden", quickRun);
+
+    // Head owned tooltip hidden in quick run
+    $("wrapHeadOwnedTip")?.classList.toggle("hidden", quickRun);
+
+    // Results visibility:
+    // Quick Run should show: P/L per head, P/L per cwt, Break-even, Sales price
+    // Full mode shows everything.
+    const hide = (id, shouldHide) => { const el = $(id); if (el) el.classList.toggle("hidden", shouldHide); };
+
+    hide("tileTotalPL", quickRun);
+    hide("tileCapitalInvested", quickRun);
+    hide("tileCattleSales", quickRun);
+    hide("tileRoe", quickRun);
+    hide("tileAnnualRoe", quickRun);
+    hide("tileIrr", quickRun);
+    $("detailsPanel")?.classList.toggle("hidden", quickRun);
+  }
+
+  // ===================== Outputs reset =====================
   function resetOutputs(){
-    ["plPerHd","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
-     "capitalInvested","cattleSales","roe","annualRoe","irr",
-     "d_costPerHd","d_deadLossDollars","d_feedCost","d_perHdCOG","d_interestPerHd",
-     "d_totalCostPerHd","d_salesPerHd","d_equityBase"
+    [
+      "plPerHd","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
+      "capitalInvested","cattleSales","roe","annualRoe","irr",
+      "d_costPerHd","d_deadLossDollars","d_feedCost","d_perHdCOG","d_interestPerHd",
+      "d_totalCostPerHd","d_salesPerHd","d_equityBase","d_myHead"
     ].forEach(id => setText(id, "—"));
   }
 
-  // ====== IRR (two-point) ======
+  // ===================== IRR (two-point) =====================
   function irrTwoPoint(c0, c1, d0, d1) {
     const msPerDay = 24 * 60 * 60 * 1000;
     const t = (d1 - d0) / msPerDay / 365.0;
@@ -111,52 +166,22 @@
     return NaN;
   }
 
-  // ====== Quick Run UI toggle ======
-  function applyQuickRunUI(){
-    $("quickRunBtn").textContent = `Quick Run: ${quickRun ? "ON" : "OFF"}`;
-
-    // Hide inputs
-    $("wrapTotalHead").classList.toggle("hidden", quickRun);
-    $("wrapOwnershipPct").classList.toggle("hidden", quickRun);
-    $("wrapInterestRate").classList.toggle("hidden", quickRun);
-    $("wrapHeadOwned").classList.toggle("hidden", quickRun);
-
-    // Hide results tiles
-    const hide = (id, shouldHide) => { const el = $(id); if (el) el.classList.toggle("hidden", shouldHide); };
-
-    // In quick run, only show P/L per head and P/L per cwt
-    hide("tileTotalPL", quickRun);
-    hide("tileBreakEven", quickRun);
-    hide("tileSalesPrice", quickRun);
-    hide("tileCapitalInvested", quickRun);
-    hide("tileCattleSales", quickRun);
-    hide("tileRoe", quickRun);
-    hide("tileAnnualRoe", quickRun);
-    hide("tileIrr", quickRun);
-    $("detailsPanel").classList.toggle("hidden", quickRun);
-
-    // Also remove Total PL color tile effect if hidden (fine either way)
-  }
-
-  // ====== Main calc ======
+  // ===================== Main calc =====================
+  // Returns a “calc snapshot” used for PDF + share.
   function updateAll(){
     clearError();
-    updateHeadOwned();
+
     updateADG();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
+    updateHeadOwnedTip();
 
-    // Equity fixed 30% (not used in Quick Run results, but fine)
+    // Equity fixed 30%
     const equityUsed = 0.30;
 
     // Inputs
     const daysOnFeed = numOrNaN("daysOnFeed");
-
-    // Interest:
-    // - Normal mode: use entered interest
-    // - Quick Run: ignore interest (treat as 0)
-    const interestRatePctRaw = numOrNaN("interestRatePct");
-    const interestRatePct = quickRun ? 0 : interestRatePctRaw;
+    const interestRatePct = numOrNaN("interestRatePct"); // included in BOTH modes
     const interestRate = interestRatePct / 100.0;
 
     const totalHead = numOrNaN("totalHead");
@@ -177,12 +202,12 @@
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
       softError("Days on Feed must be > 0.");
       resetOutputs(); applyStatus(NaN);
-      return;
+      return null;
     }
     if (isFinite(inWeight) && isFinite(outWeight) && inWeight > 0 && outWeight > 0 && outWeight <= inWeight) {
       softError("Out Weight must be greater than In Weight.");
       resetOutputs(); applyStatus(NaN);
-      return;
+      return null;
     }
 
     const haveCore =
@@ -194,11 +219,25 @@
       isFinite(outWeight) && outWeight > 0 &&
       isFinite(cogNoInterest);
 
+    // Snapshot (for PDF/share)
+    const snap = {
+      quickRun,
+      inDate, outDate,
+      daysOnFeed,
+      totalHead, ownershipPct: ownership*100,
+      inWeight, outWeight, adg: Number(strOrEmpty("adg")) || NaN,
+      priceCwt,
+      cogNoInterest,
+      deathLossPct,
+      interestRatePct,
+      futures, basis
+    };
+
     if (!haveCore) {
       resetOutputs();
       if (isFinite(futures) && isFinite(basis)) setText("salesPrice", moneyPerCwt(futures + basis));
       applyStatus(NaN);
-      return;
+      return null;
     }
 
     const gained = outWeight - inWeight;
@@ -208,7 +247,6 @@
     const feedCost = gained * cogNoInterest;
     const perHdCOG = feedCost + deadLossDollars;
 
-    // Interest per hd (0 in Quick Run)
     const interestPerHd =
       (((costPerHd + (0.5 * perHdCOG)) * interestRate) / 365.0) * daysOnFeed;
 
@@ -230,7 +268,7 @@
       setText("plPerCwt","—");
       setText("plPerHd","—");
 
-      // In Quick Run, that’s basically all we show
+      // Clear full-mode outputs
       setText("projectedTotalPL","—");
       setText("capitalInvested","—");
       setText("cattleSales","—");
@@ -240,7 +278,7 @@
       setText("d_salesPerHd","—");
       setText("d_equityBase","—");
       applyStatus(NaN);
-      return;
+      return null;
     }
 
     const salesPrice = futures + basis;
@@ -254,7 +292,7 @@
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
 
-    // If Quick Run: stop here (no totals, no ROE, no IRR)
+    // Quick Run stops here (but still includes BE + Sale + PL/hd + PL/cwt)
     if (quickRun) {
       setText("projectedTotalPL","—");
       setText("capitalInvested","—");
@@ -264,10 +302,23 @@
       setText("irr","—");
       setText("d_equityBase","—");
       applyStatus(plPerHd);
-      return;
+
+      return {
+        ...snap,
+        breakEvenCwt, salesPrice, plPerCwt, plPerHd,
+        costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd,
+        salesPerHd,
+        myHead: NaN,
+        capitalInvested: NaN,
+        cattleSales: NaN,
+        projectedTotalPL: NaN,
+        roe: NaN,
+        annualRoe: NaN,
+        irr: NaN
+      };
     }
 
-    // Totals (normal mode)
+    // Totals (full mode)
     const haveTotals = isFinite(totalHead) && totalHead > 0 && isFinite(ownership) && ownership > 0;
     if (!haveTotals) {
       setText("projectedTotalPL","—");
@@ -278,7 +329,20 @@
       setText("irr","—");
       setText("d_equityBase","—");
       applyStatus(plPerHd);
-      return;
+
+      return {
+        ...snap,
+        breakEvenCwt, salesPrice, plPerCwt, plPerHd,
+        costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd,
+        salesPerHd,
+        myHead: NaN,
+        capitalInvested: NaN,
+        cattleSales: NaN,
+        projectedTotalPL: NaN,
+        roe: NaN,
+        annualRoe: NaN,
+        irr: NaN
+      };
     }
 
     const myHead = totalHead * ownership;
@@ -301,17 +365,32 @@
     const annualRoe = (isFinite(roe) && years > 0) ? (Math.pow(1 + roe, 1 / years) - 1) : NaN;
     setText("annualRoe", pct(annualRoe));
 
+    let irr = NaN;
     if (inDate && outDate) {
-      const irr = irrTwoPoint(-capitalInvested, cattleSales, inDate, outDate);
+      irr = irrTwoPoint(-capitalInvested, cattleSales, inDate, outDate);
       setText("irr", pct(irr));
     } else {
       setText("irr","—");
     }
 
     applyStatus(plPerHd);
+
+    return {
+      ...snap,
+      breakEvenCwt, salesPrice, plPerCwt, plPerHd,
+      costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd,
+      salesPerHd,
+      myHead,
+      capitalInvested,
+      cattleSales,
+      projectedTotalPL,
+      roe,
+      annualRoe,
+      irr
+    };
   }
 
-  // ================== Mobile wheel picker (phones only) ==================
+  // ===================== Mobile wheel picker =====================
   const overlay = $("pickerOverlay");
   const wheel = $("pickerWheel");
   const titleEl = $("pickerTitle");
@@ -430,123 +509,351 @@
     el.addEventListener("click", () => openPicker(el, cfg));
   }
 
-  // ================== PDF generation ==================
+  // ===================== Scenario share =====================
+  function buildScenarioUrl() {
+    const p = new URLSearchParams();
+
+    // Always store quickRun flag
+    p.set("qr", quickRun ? "1" : "0");
+
+    // Inputs
+    const fields = [
+      ["inDate","id"], ["daysOnFeed","dof"],
+      ["totalHead","th"], ["ownershipPct","own"],
+      ["inWeight","iw"], ["priceCwt","pp"], ["outWeight","ow"],
+      ["cogNoInterest","cog"], ["deathLossPct","dl"],
+      ["interestRatePct","ir"], ["futures","fut"], ["basis","bas"]
+    ];
+
+    for (const [id, key] of fields) {
+      const v = strOrEmpty(id);
+      if (v !== "") p.set(key, v);
+    }
+
+    const url = new URL(window.location.href);
+    url.search = p.toString();
+    return url.toString();
+  }
+
+  async function shareScenario() {
+    const url = buildScenarioUrl();
+    const title = "CMS Breakeven Scenario";
+    const text = "Here’s a CMS breakeven scenario link.";
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        return;
+      }
+    } catch (e) {
+      // fall through to clipboard
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Scenario link copied to clipboard.");
+    } catch (e) {
+      prompt("Copy this scenario link:", url);
+    }
+  }
+
+  function applyScenarioFromUrl() {
+    const p = new URLSearchParams(window.location.search);
+    if (!p || [...p.keys()].length === 0) return;
+
+    quickRun = p.get("qr") === "1";
+
+    const map = [
+      ["inDate","id"], ["daysOnFeed","dof"],
+      ["totalHead","th"], ["ownershipPct","own"],
+      ["inWeight","iw"], ["priceCwt","pp"], ["outWeight","ow"],
+      ["cogNoInterest","cog"], ["deathLossPct","dl"],
+      ["interestRatePct","ir"], ["futures","fut"], ["basis","bas"]
+    ];
+
+    for (const [id, key] of map) {
+      const v = p.get(key);
+      if (v !== null && $(id)) $(id).value = v;
+    }
+  }
+
+  // ===================== PDF (Executive One-Page) =====================
   function sanitizeFilename(name) {
     return String(name).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   }
 
-  function getInputValueLabel(id) {
-    const el = $(id);
-    if (!el) return "—";
-    const v = String(el.value ?? "").trim();
-    return v ? v : "—";
+  function niceDate(d) {
+    if (!d || isNaN(d.getTime())) return "—";
+    // Example: Feb 5, 2026
+    return d.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
   }
 
   function downloadPdf() {
-    // Ensure latest numbers are on screen
-    updateAll();
-
+    const calc = updateAll(); // ensure latest
     const scenario = prompt("Scenario name for this PDF?");
-    if (scenario === null) return; // cancelled
+    if (scenario === null) return;
+
     const title = sanitizeFilename(scenario) || "Scenario";
 
     const jsPDF = window.jspdf?.jsPDF;
     if (!jsPDF) {
-      alert("PDF library not loaded. Check your internet connection or the jsPDF script tag.");
+      alert("PDF library not loaded. Check the jsPDF script tag / connection.");
       return;
     }
 
+    // Recompute snapshot if updateAll returned null (still allow PDF with partials)
+    const inDate = parseDateOrNull("inDate");
+    const outDate = parseDateOrNull("inDate") && isFinite(numOrNaN("daysOnFeed")) ? addDays(parseDateOrNull("inDate"), numOrNaN("daysOnFeed")) : null;
+
+    const safe = (v) => (v === undefined || v === null || v === "" ? "—" : String(v));
+
+    // Pull rendered values (already formatted) where possible
+    const v_plHd = $("plPerHd")?.textContent || "—";
+    const v_totalPL = $("projectedTotalPL")?.textContent || "—";
+    const v_be = $("breakEvenCwt")?.textContent || "—";
+    const v_sale = $("salesPrice")?.textContent || "—";
+
+    const v_roe = $("roe")?.textContent || "—";
+    const v_aroe = $("annualRoe")?.textContent || "—";
+    const v_irr = $("irr")?.textContent || "—";
+
+    const v_cap = $("capitalInvested")?.textContent || "—";
+    const v_sales = $("cattleSales")?.textContent || "—";
+
+    // Net margin / cwt = P/L per cwt (already formatted as $x /cwt)
+    const v_margin = $("plPerCwt")?.textContent || "—";
+
+    const v_dof = safe(strOrEmpty("daysOnFeed"));
+    const v_headOwned = quickRun ? "—" : ($("headOwnedTip")?.textContent || "—");
+
+    // Inputs for bottom section
+    const i_inWt = safe(strOrEmpty("inWeight")) + " lb";
+    const i_outWt = safe(strOrEmpty("outWeight")) + " lb";
+    const i_adg = safe(strOrEmpty("adg"));
+    const i_dl = safe(strOrEmpty("deathLossPct")) + "%";
+
+    const i_purchase = safe(strOrEmpty("priceCwt")) + " / cwt";
+    const i_cog = safe(strOrEmpty("cogNoInterest")) + " / lb gain";
+    const i_fut = safe(strOrEmpty("futures")) + " / cwt";
+    const i_bas = safe(strOrEmpty("basis")) + " / cwt";
+
+    const i_ir = safe(strOrEmpty("interestRatePct")) + "%";
+
+    // ----- PDF drawing -----
     const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const W = 612, H = 792;
+    const margin = 42;
 
-    const margin = 44;
-    let y = margin;
+    const cmsBlue = [51, 102, 153];
+    const muted = [107, 114, 128];
+    const ink = [15, 23, 42];
 
-    // Title
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text(title, margin, y);
+    // Helper: set text color quickly
+    const tc = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+
+    // Background is white by default.
+
+    // 1) Header bar
+    doc.setFillColor(cmsBlue[0], cmsBlue[1], cmsBlue[2]);
+    doc.rect(0, 0, W, 34, "F");
+
+    // Title stack
+    let y = 34 + 18;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+    tc(ink); doc.text("CMS Breakeven Calculator", margin, y);
+
+    y += 16;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    tc(muted); doc.text("Lot Economics Summary", margin, y);
+
+    // Header meta row (muted)
+    y += 18;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    tc(muted);
+
+    const leftX = margin;
+    const rightX = margin + 260;
+
+    doc.text(`In Date: `, leftX, y);
+    doc.setFont("helvetica", "bold"); tc(ink);
+    doc.text(niceDate(inDate), leftX + 44, y);
+
+    doc.setFont("helvetica", "normal"); tc(muted);
+    doc.text(`Out Date: `, rightX, y);
+    doc.setFont("helvetica", "bold"); tc(ink);
+    doc.text(niceDate(outDate), rightX + 50, y);
+
+    y += 16;
+    doc.setFont("helvetica", "normal"); tc(muted);
+    doc.text(`Days on Feed: `, leftX, y);
+    doc.setFont("helvetica", "bold"); tc(ink);
+    doc.text(v_dof, leftX + 72, y);
+
+    doc.setFont("helvetica", "normal"); tc(muted);
+    doc.text(`Head Owned: `, rightX, y);
+    doc.setFont("helvetica", "bold"); tc(ink);
+    doc.text(safe(v_headOwned), rightX + 66, y);
+
+    // 2) Results Snapshot (two big cards)
     y += 18;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text("CMS Breakeven Calculator", margin, y);
-    y += 18;
+    const cardGap = 12;
+    const cardW = (W - margin*2 - cardGap) / 2;
+    const cardH = 118;
+    const cardY = y;
 
-    // Helper to write section
-    function section(label) {
-      y += 10;
+    function card(x, y, w, h) {
+      doc.setDrawColor(219, 227, 239);
+      doc.setFillColor(255,255,255);
+      doc.roundedRect(x, y, w, h, 12, 12, "FD");
+    }
+    function label(x, y, txt) {
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(label, margin, y);
-      y += 10;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
+      doc.setFontSize(10);
+      tc(muted);
+      doc.text(txt, x, y);
     }
 
-    function row(k, v) {
-      const left = `${k}:`;
-      const right = String(v ?? "—");
-      const maxWidth = 540;
-      doc.setFont("helvetica", "bold");
-      doc.text(left, margin, y, { maxWidth: 200 });
-      doc.setFont("helvetica", "normal");
-      doc.text(right, margin + 170, y, { maxWidth: maxWidth - 170 });
-      y += 16;
+    const c1x = margin;
+    const c2x = margin + cardW + cardGap;
+    card(c1x, cardY, cardW, cardH);
+    card(c2x, cardY, cardW, cardH);
 
-      if (y > 740) { doc.addPage(); y = margin; }
+    // Left card: PL/Head big, Total PL
+    doc.setFont("helvetica", "bold"); doc.setFontSize(28); tc(ink);
+    doc.text(v_plHd.replace(" /hd",""), c1x + 14, cardY + 42);
+    label(c1x + 14, cardY + 60, "P/L PER HEAD");
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); tc(ink);
+    doc.text(quickRun ? "—" : v_totalPL, c1x + 14, cardY + 90);
+    label(c1x + 14, cardY + 106, "TOTAL P/L");
+
+    // Right card: Break-even, Sale
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); tc(ink);
+    doc.text(v_be, c2x + 14, cardY + 44);
+    label(c2x + 14, cardY + 60, "BREAK-EVEN");
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); tc(ink);
+    doc.text(v_sale, c2x + 14, cardY + 92);
+    label(c2x + 14, cardY + 106, "PROJECTED SALE");
+
+    y = cardY + cardH + 14;
+
+    // 3) Performance Metrics Row
+    const perfH = 54;
+    const perfY = y;
+    const perfGap = 10;
+    const perfW = (W - margin*2 - perfGap*2) / 3;
+
+    function smallCard(x,y,w,h){
+      doc.setDrawColor(219, 227, 239);
+      doc.setFillColor(255,255,255);
+      doc.roundedRect(x,y,w,h,10,10,"FD");
     }
 
-    // Inputs
-    section("Inputs");
-    row("In Date", getInputValueLabel("inDate"));
-    row("Days on Feed", getInputValueLabel("daysOnFeed"));
-    row("ADG", getInputValueLabel("adg"));
-    row("Out Date", getInputValueLabel("outDateInline"));
-    row("In Weight (lb)", getInputValueLabel("inWeight"));
-    row("Out Weight (lb)", getInputValueLabel("outWeight"));
-    row("Purchase Price ($/cwt)", getInputValueLabel("priceCwt"));
-    row("Projected COG ($/lb gain)", getInputValueLabel("cogNoInterest"));
-    row("Death Loss (%)", getInputValueLabel("deathLossPct"));
-    row("Futures ($/cwt)", getInputValueLabel("futures"));
-    row("Expected Basis ($/cwt)", getInputValueLabel("basis"));
+    const p1x = margin;
+    const p2x = margin + perfW + perfGap;
+    const p3x = margin + (perfW + perfGap)*2;
 
-    if (!quickRun) {
-      row("Total Head", getInputValueLabel("totalHead"));
-      row("Ownership (%)", getInputValueLabel("ownershipPct"));
-      row("Head Owned", getInputValueLabel("headOwned"));
-      row("Interest Rate (%)", getInputValueLabel("interestRatePct"));
-    } else {
-      row("Mode", "Quick Run (interest excluded)");
+    smallCard(p1x, perfY, perfW, perfH);
+    smallCard(p2x, perfY, perfW, perfH);
+    smallCard(p3x, perfY, perfW, perfH);
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
+    doc.text("ROE", p1x + 10, perfY + 18);
+    doc.text("ANNUALIZED ROE", p2x + 10, perfY + 18);
+    doc.text("IRR", p3x + 10, perfY + 18);
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(14); tc(ink);
+    doc.text(quickRun ? "—" : v_roe,  p1x + 10, perfY + 40);
+    doc.text(quickRun ? "—" : v_aroe, p2x + 10, perfY + 40);
+    doc.text(quickRun ? "—" : v_irr,  p3x + 10, perfY + 40);
+
+    y = perfY + perfH + 14;
+
+    // 4) Cost & Capital Summary (condensed)
+    const ccY = y;
+    const ccH = 74;
+    card(margin, ccY, W - margin*2, ccH);
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
+    doc.text("Capital Invested:", margin + 14, ccY + 24);
+    doc.text("Cattle Sales:",    margin + 14, ccY + 44);
+    doc.text("Net Margin / cwt:",margin + 14, ccY + 64);
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); tc(ink);
+    const rightEdge = W - margin - 14;
+
+    const capTxt = quickRun ? "—" : v_cap;
+    const salesTxt = quickRun ? "—" : v_sales;
+
+    doc.text(capTxt, rightEdge, ccY + 24, { align:"right" });
+    doc.text(salesTxt, rightEdge, ccY + 44, { align:"right" });
+    doc.text(v_margin, rightEdge, ccY + 64, { align:"right" });
+
+    y = ccY + ccH + 14;
+
+    // 5) Inputs (de-emphasized, grouped, two-column)
+    doc.setFont("helvetica","bold"); doc.setFontSize(11); tc(muted);
+    doc.text("Inputs", margin, y);
+    y += 10;
+
+    const boxW = (W - margin*2 - 12) / 2;
+    const boxH = 96;
+    const box1x = margin;
+    const box2x = margin + boxW + 12;
+    const boxY = y;
+
+    // Weights & Performance box
+    smallCard(box1x, boxY, boxW, boxH);
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
+    doc.text("Weights & Performance", box1x + 10, boxY + 18);
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
+    const r1y = boxY + 36;
+    const rowGap = 16;
+
+    function kv(x,y,k,v){
+      doc.setFont("helvetica","normal"); tc(muted); doc.text(k, x, y);
+      doc.setFont("helvetica","bold"); tc(ink); doc.text(v, x + 86, y);
     }
+    kv(box1x + 10, r1y + 0, "In Weight:", i_inWt);
+    kv(box1x + 10, r1y + rowGap, "Out Weight:", i_outWt);
+    kv(box1x + 10, r1y + rowGap*2, "ADG:", i_adg);
+    kv(box1x + 10, r1y + rowGap*3, "Death Loss:", i_dl);
 
-    // Results
-    section("Results");
-    row("P/L per head", $("plPerHd")?.textContent || "—");
-    row("P/L per cwt", $("plPerCwt")?.textContent || "—");
+    // Pricing Assumptions box
+    smallCard(box2x, boxY, boxW, boxH);
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
+    doc.text("Pricing Assumptions", box2x + 10, boxY + 18);
 
-    if (!quickRun) {
-      row("Projected Total P/L", $("projectedTotalPL")?.textContent || "—");
-      row("Break-even", $("breakEvenCwt")?.textContent || "—");
-      row("Sales Price", $("salesPrice")?.textContent || "—");
-      row("Capital Invested", $("capitalInvested")?.textContent || "—");
-      row("Cattle Sales", $("cattleSales")?.textContent || "—");
-      row("ROE", $("roe")?.textContent || "—");
-      row("Annualized ROE", $("annualRoe")?.textContent || "—");
-      row("IRR", $("irr")?.textContent || "—");
-    }
+    const r2y = boxY + 36;
+    kv(box2x + 10, r2y + 0, "Purchase:", i_purchase);
+    kv(box2x + 10, r2y + rowGap, "COG:", i_cog);
+    kv(box2x + 10, r2y + rowGap*2, "Futures:", i_fut);
+    kv(box2x + 10, r2y + rowGap*3, "Basis:", i_bas);
+
+    y = boxY + boxH + 12;
+
+    // Financing box (full width)
+    smallCard(margin, y, W - margin*2, 48);
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
+    doc.text("Financing", margin + 10, y + 18);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
+    doc.text("Interest Rate:", margin + 10, y + 36);
+    doc.setFont("helvetica","bold"); tc(ink);
+    doc.text(i_ir, margin + 92, y + 36);
 
     doc.save(`${title}.pdf`);
   }
 
-  // ====== Reset ======
+  // ===================== Reset =====================
   function resetAll() {
-    ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"].forEach(id => { if ($(id)) $(id).value = ""; });
+    const clearIds = ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"];
+    clearIds.forEach(id => { if ($(id)) $(id).value = ""; });
 
     const t = new Date();
-    const yyyy = t.getFullYear();
-    const mm = String(t.getMonth()+1).padStart(2,"0");
-    const dd = String(t.getDate()).padStart(2,"0");
-    if ($("inDate")) $("inDate").value = `${yyyy}-${mm}-${dd}`;
+    if ($("inDate")) $("inDate").value = dateToISO(t);
 
     if ($("ownershipPct")) $("ownershipPct").value = "100";
 
@@ -557,7 +864,6 @@
     if ($("basis")) $("basis").value = "0.0";
 
     if ($("adg")) $("adg").value = "—";
-    if ($("headOwned")) $("headOwned").value = "—";
     if ($("outDateInline")) $("outDateInline").value = "—";
 
     clearError();
@@ -566,14 +872,14 @@
     updateAll();
   }
 
-  // ====== Init ======
+  // ===================== Init =====================
   window.addEventListener("DOMContentLoaded", () => {
-    // defaults
+    // Apply scenario from URL first (so defaults don’t overwrite it)
+    applyScenarioFromUrl();
+
+    // Defaults if empty
     const t = new Date();
-    const yyyy = t.getFullYear();
-    const mm = String(t.getMonth()+1).padStart(2,"0");
-    const dd = String(t.getDate()).padStart(2,"0");
-    if ($("inDate") && !$("inDate").value) $("inDate").value = `${yyyy}-${mm}-${dd}`;
+    if ($("inDate") && !$("inDate").value) $("inDate").value = dateToISO(t);
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
 
     if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
@@ -581,7 +887,8 @@
     if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
     if ($("basis") && !$("basis").value) $("basis").value = "0.0";
 
-    // Mobile picker lists (0.05 increments for interest)
+    // Mobile pickers
+    // Interest: 0–25 in 0.05 steps (2 decimals)
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
@@ -593,13 +900,15 @@
     attachMobilePicker("basis",           { title:"Expected Basis", values: bVals, defaultValue: 0.0 });
 
     // Auto-calc on inputs
-    const ids = ["inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures",
-                 "interestRatePct","cogNoInterest","deathLossPct","basis"];
+    const ids = [
+      "inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
+      "cogNoInterest","deathLossPct","interestRatePct","futures","basis"
+    ];
     ids.forEach(id => {
       const el = $(id);
       if (!el) return;
-      el.addEventListener("input", updateAll);
-      el.addEventListener("change", updateAll);
+      el.addEventListener("input", () => updateAll());
+      el.addEventListener("change", () => updateAll());
     });
 
     // Buttons
@@ -613,20 +922,11 @@
 
     $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
 
+    $("shareScenarioBtn")?.addEventListener("click", shareScenario);
+
+    // Apply quick run (in case URL set it)
     applyQuickRunUI();
     updateAll();
   });
-
-  // helper to build ranges for wheel picker
-  function rangeValues({ start, end, step, decimals }) {
-    const vals = [];
-    const n = Math.round((end - start) / step);
-    for (let i = 0; i <= n; i++) {
-      const v = start + i * step;
-      const value = Number(v.toFixed(decimals));
-      vals.push({ value, label: value.toFixed(decimals) });
-    }
-    return vals;
-  }
 
 })();
