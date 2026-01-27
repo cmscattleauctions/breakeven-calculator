@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
 
-  <!-- jsPDF will be used by app.js (we’ll update PDF logic in the next response) -->
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
@@ -198,7 +197,6 @@
     }
     .metric .k{ font-size:12px; color:var(--muted); }
     .metric .v{ font-size:18px; font-weight:900; margin-top:2px; }
-    .metric.small .metric .v{ font-size:15px; }
     .metric.small .v{ font-size:15px; font-weight:900; }
 
     .metric.good{ background:var(--good-bg); border-color:var(--good-bd); color:var(--good-tx); }
@@ -206,7 +204,7 @@
     .metric.bad{  background:var(--bad-bg);  border-color:var(--bad-bd);  color:var(--bad-tx); }
     .metric.good .k, .metric.mid .k, .metric.bad .k{ color:inherit; opacity:.85; }
 
-    /* Result block with inline tooltip text (contracts) */
+    /* Result block with inline tooltip text */
     .metricFoot{
       margin-top:6px;
       font-size:12px;
@@ -295,7 +293,6 @@
     }
     .wheelItem.active{ color:rgba(255,255,255,.95); }
 
-    /* Hidden PDF template container — logic lives in app.js */
     .pdfTemplate{ display:none; }
   </style>
 </head>
@@ -333,7 +330,6 @@
             <div class="field withTip" id="wrapOwnershipPct">
               <label>Ownership (%)</label>
               <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
-              <!-- Tooltip-style head owned (hidden on Quick Run) -->
               <div class="tipLine" id="wrapHeadOwnedTip" aria-live="polite">
                 <span class="tipBadge">i</span>
                 <span>Head Owned:</span>
@@ -369,6 +365,12 @@
 
           <!-- RIGHT COLUMN -->
           <div class="col">
+            <!-- MOVED: Interest rate above days on feed -->
+            <div class="field" id="wrapInterestRate">
+              <label>Interest Rate (%)</label>
+              <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
+            </div>
+
             <div class="field">
               <label>Days on Feed</label>
               <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
@@ -384,11 +386,6 @@
               <input id="outDateInline" type="text" readonly value="—" />
             </div>
 
-            <div class="field" id="wrapInterestRate">
-              <label>Interest Rate (%)</label>
-              <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
-            </div>
-
             <div class="field">
               <label>Futures ($/cwt)</label>
               <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
@@ -396,7 +393,6 @@
 
             <div class="field">
               <label>Expected Basis ($/cwt)</label>
-              <!-- NOTE: basis picker will move in FULL $ increments (step=1). JS picker list updated next. -->
               <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" />
             </div>
           </div>
@@ -418,13 +414,7 @@
           </div>
         </div>
 
-        <!-- Contracts tooltip (visible only when Quick Run OFF; JS will toggle) -->
-        <div class="tipLine hidden" id="contractsInfoLine" style="margin-top:-2px;margin-bottom:10px;">
-          <span class="tipBadge">i</span>
-          <span id="contractsInfoText">
-            Contracts needed are based on Head Owned (not the full lot). Uses Feeder under 1,000 lb and Live at/over 1,000 lb.
-          </span>
-        </div>
+        <!-- REMOVED: the top-of-results contracts tooltip line (only keep tooltip inside contracts tile) -->
 
         <div class="resultsGrid" id="resultsGrid">
           <div class="metric" id="tilePlPerHd">
@@ -447,7 +437,6 @@
             <div class="v" id="salesPrice">—</div>
           </div>
 
-          <!-- New: Contracts needed (Quick Run OFF only) -->
           <div class="metric" id="tileContractsNeeded">
             <div class="k" id="contractsLabel">Contracts Needed</div>
             <div class="v" id="contractsNeeded">—</div>
@@ -459,7 +448,6 @@
             </div>
           </div>
 
-          <!-- Projected Total P/L will be moved on PDF per your spec (JS update next), but stays here for full mode -->
           <div class="metric" id="tileTotalPL">
             <div class="k">Projected Total P/L</div>
             <div class="v" id="projectedTotalPL">—</div>
@@ -528,17 +516,12 @@
     </div>
   </div>
 
-  <!-- Hidden PDF template container (structure only; app.js will generate the new PDF ordering) -->
-  <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true">
-    <!-- NOTE: You asked to reorder PDF and make Scenario Name the main title.
-         We will implement that in app.js:
-         - Scenario name as Title
-         - Contracts needed (with tooltips) in the snapshot area where BE/Sale were
-         - Move Break-even + Projected sale down below inputs
-         - Place Projected Total P/L on same line as contracts area per spec
-    -->
-    <div id="pdfScenarioName">—</div>
-  </section>
+  <!-- Hidden PDF template container (structure only; PDF drawing is in app.js)
+       Requested PDF tweaks (implemented in app.js next):
+       - Contracts tooltip: smaller font and moved BELOW Total P/L
+       - Total P/L: styled like P/L per head (same prominence)
+  -->
+  <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true"></section>
 
   <script src="./app.js"></script>
 </body>
