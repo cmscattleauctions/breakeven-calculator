@@ -34,31 +34,11 @@
     }
 
     header{
-      padding:14px 16px;
+      padding:16px;
       background:var(--cms);
       color:#fff;
     }
-    .headerRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      max-width:1200px;
-      margin:0 auto;
-    }
-    header h1{ margin:0; font-size:18px; font-weight:900; }
-    .topActions{ display:flex; gap:10px; flex-wrap:wrap; }
-    .topActions button{
-      border:0;
-      border-radius:12px;
-      padding:10px 12px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:13px;
-      background:rgba(255,255,255,.16);
-      color:#fff;
-    }
-    .topActions button:hover{ background:rgba(255,255,255,.22); }
+    header h1{ margin:0; font-size:18px; font-weight:900; max-width:1200px; margin-inline:auto; }
 
     main{ max-width:1200px; margin:0 auto; padding:14px; }
 
@@ -82,7 +62,29 @@
     .resultsCard{
       background:var(--results-bg);
     }
-    .card h2{ margin:0 0 10px; font-size:15px; }
+
+    .cardHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .cardHeader h2{ margin:0; font-size:15px; }
+    .headerActions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+    button{
+      border:0;
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:13px;
+    }
+    .secondary{ background:#e8eef7; color:#0f172a; }
+    .primary{ background:var(--cms); color:#fff; }
+    .ghost{ background:rgba(15,23,42,.06); color:#0f172a; }
+    .toggleOn{ background:#0f172a; color:#fff; }
 
     label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
 
@@ -104,21 +106,6 @@
       cursor:default;
     }
 
-    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
-
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
-    button{
-      border:0;
-      border-radius:12px;
-      padding:11px 14px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:14px;
-    }
-    .secondary{ background:#e8eef7; color:#0f172a; }
-    .primary{ background:var(--cms); color:#fff; }
-
-    /* Web layout: two columns INSIDE inputs card */
     .inputsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -129,6 +116,10 @@
     }
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
     .hidden{ display:none !important; }
+
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+
+    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
     /* Results */
     .resultsGrid{
@@ -177,7 +168,7 @@
     .calc-table td:first-child{ color:var(--muted); width:60%; }
     .calc-table td:last-child{ text-align:right; font-weight:900; }
 
-    /* iOS-style picker modal (mobile only) */
+    /* iOS-style picker modal (phones only) */
     .overlay{
       position:fixed; inset:0;
       background:rgba(0,0,0,.55);
@@ -237,22 +228,19 @@
 </head>
 
 <body>
-  <header>
-    <div class="headerRow">
-      <h1>CMS Breakeven Calculator</h1>
-      <div class="topActions">
-        <button id="quickRunBtn" type="button">Quick Run: OFF</button>
-        <button id="downloadPdfBtn" type="button">Download PDF</button>
-      </div>
-    </div>
-  </header>
+  <header><h1>CMS Breakeven Calculator</h1></header>
 
   <main>
     <div class="grid">
 
       <!-- INPUTS -->
       <section class="card">
-        <h2>Inputs</h2>
+        <div class="cardHeader">
+          <h2>Inputs</h2>
+          <div class="headerActions">
+            <button id="quickRunBtn" type="button" class="ghost">Quick Run: OFF</button>
+          </div>
+        </div>
 
         <div class="inputsGrid">
           <!-- LEFT COLUMN -->
@@ -345,7 +333,13 @@
 
       <!-- RESULTS -->
       <section class="card resultsCard">
-        <h2>Results</h2>
+        <div class="cardHeader">
+          <h2>Results</h2>
+          <div class="headerActions">
+            <button id="shareScenarioBtn" type="button" class="ghost">Share Scenario</button>
+            <button id="downloadPdfBtn" type="button" class="primary">Download PDF</button>
+          </div>
+        </div>
 
         <div class="resultsGrid" id="resultsGrid">
           <div class="metric" id="tilePlPerHd">
@@ -369,7 +363,7 @@
           </div>
 
           <div class="metric small" id="tileSalesPrice">
-            <div class="k">Sales Price (Futures + Basis)</div>
+            <div class="k">Projected Sale (Futures + Basis)</div>
             <div class="v" id="salesPrice">—</div>
           </div>
 
@@ -384,7 +378,7 @@
           </div>
 
           <div class="metric" id="tileRoe">
-            <div class="k">Return on Equity (ROE)</div>
+            <div class="k">ROE</div>
             <div class="v" id="roe">—</div>
           </div>
 
