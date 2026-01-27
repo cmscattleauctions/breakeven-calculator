@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
 
-  <!-- jsPDF for PDF generation (no server needed) -->
+  <!-- jsPDF will be used by app.js (we’ll wire the PDF layout + logic in the next response) -->
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
@@ -18,6 +18,7 @@
       --soft:#eef2f7;
       --disabled:#f2f4f8;
 
+      /* Results panel background */
       --results-bg:#eaf2ff;
 
       --good-bg:#ecfdf5; --good-bd:#10b981; --good-tx:#065f46;
@@ -38,7 +39,12 @@
       background:var(--cms);
       color:#fff;
     }
-    header h1{ margin:0; font-size:18px; font-weight:900; max-width:1200px; margin-inline:auto; }
+    header h1{
+      margin:0;
+      font-size:18px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
 
     main{ max-width:1200px; margin:0 auto; padding:14px; }
 
@@ -66,23 +72,51 @@
       align-items:center;
       justify-content:space-between;
       gap:10px;
-      margin-bottom:10px;
+      margin:0 0 10px;
     }
     .cardHeader h2{ margin:0; font-size:15px; }
-    .headerActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .cardHeader .headerActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
 
-    .toggleBtn, .smallBtn{
+    .pillToggle{
+      border:1px solid rgba(15,23,42,.12);
+      background:#fff;
+      color:#0f172a;
+      border-radius:999px;
+      padding:7px 10px;
+      font-weight:900;
+      font-size:12px;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .pillToggle[data-on="true"]{
+      background:rgba(51,102,153,.12);
+      border-color:rgba(51,102,153,.30);
+      color:#0f172a;
+    }
+
+    button{
       border:0;
       border-radius:12px;
-      padding:8px 10px;
+      padding:10px 12px;
       font-weight:900;
       cursor:pointer;
       font-size:13px;
+      background:#e8eef7;
+      color:#0f172a;
+      white-space:nowrap;
     }
-    .toggleBtn{ background:#e8eef7; color:#0f172a; }
-    .toggleBtn.on{ background:var(--cms); color:#fff; }
-    .smallBtn{ background:rgba(51,102,153,.12); color:#0f172a; }
-    .smallBtn.primary{ background:var(--cms); color:#fff; }
+    button.primary{
+      background:var(--cms);
+      color:#fff;
+    }
+
+    .hidden{ display:none !important; }
 
     label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
 
@@ -98,6 +132,7 @@
       outline:2px solid rgba(51,102,153,.25);
       border-color:rgba(51,102,153,.45);
     }
+    /* Only formula fields are grey */
     input[readonly]{
       background:var(--disabled);
       color:#111827;
@@ -105,16 +140,6 @@
     }
 
     .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
-    button.bigBtn{
-      border:0;
-      border-radius:12px;
-      padding:11px 14px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:14px;
-    }
-    .secondary{ background:#e8eef7; color:#0f172a; }
 
     /* Inputs layout */
     .inputsGrid{
@@ -126,9 +151,35 @@
       .inputsGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     }
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
-    .hidden{ display:none !important; }
+    .field{ min-width:0; }
 
-    /* Results */
+    /* Ownership + Head Owned tooltip */
+    .withTip{ position:relative; }
+    .tipLine{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:6px;
+      user-select:none;
+    }
+    .tipBadge{
+      width:18px; height:18px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:12px;
+      background:#eef2f7;
+      color:#0f172a;
+      border:1px solid rgba(15,23,42,.10);
+      flex:0 0 auto;
+    }
+    .tipValue{ font-weight:900; color:#0f172a; }
+
+    /* Results tiles */
     .resultsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -175,7 +226,7 @@
     .calc-table td:first-child{ color:var(--muted); width:60%; }
     .calc-table td:last-child{ text-align:right; font-weight:900; }
 
-    /* iOS-style picker modal (phones only) */
+    /* iOS-style picker modal (mobile only; wired in app.js) */
     .overlay{
       position:fixed; inset:0;
       background:rgba(0,0,0,.55);
@@ -201,7 +252,6 @@
     .pickerTop button{
       background:transparent; color:#fff; font-weight:900;
       padding:8px 10px; border-radius:12px;
-      border:0; cursor:pointer;
     }
     .pickerTop button:hover{ background:rgba(255,255,255,.08); }
 
@@ -232,6 +282,11 @@
       pointer-events:none;
     }
     .wheelItem.active{ color:rgba(255,255,255,.95); }
+
+    /* ---------- PDF template container (hidden) ----------
+       app.js will use this structure to generate the executive one-page layout you specified.
+    */
+    .pdfTemplate{ display:none; }
   </style>
 </head>
 
@@ -244,11 +299,12 @@
     <div class="grid">
 
       <!-- INPUTS -->
-      <section class="card">
+      <section class="card" aria-label="Inputs">
         <div class="cardHeader">
           <h2>Inputs</h2>
           <div class="headerActions">
-            <button id="quickRunBtn" class="toggleBtn" type="button">Quick Run: OFF</button>
+            <!-- Quick Run toggle moved next to Inputs title -->
+            <button id="quickRunBtn" class="pillToggle" type="button" data-on="false">Quick Run: OFF</button>
           </div>
         </div>
 
@@ -260,14 +316,22 @@
               <input id="inDate" type="date" />
             </div>
 
+            <!-- Hidden on Quick Run -->
             <div class="field" id="wrapTotalHead">
               <label>Total Head</label>
               <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
             </div>
 
-            <div class="field" id="wrapOwnershipPct">
+            <!-- Hidden on Quick Run -->
+            <div class="field withTip" id="wrapOwnershipPct">
               <label>Ownership (%)</label>
               <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
+              <!-- Tooltip-style head owned (hidden on Quick Run) -->
+              <div class="tipLine" id="wrapHeadOwnedTip" aria-live="polite">
+                <span class="tipBadge">i</span>
+                <span>Head Owned:</span>
+                <span class="tipValue" id="headOwnedTip">—</span>
+              </div>
             </div>
 
             <div class="field">
@@ -313,8 +377,10 @@
               <input id="outDateInline" type="text" readonly value="—" />
             </div>
 
-            <div class="field">
+            <!-- Interest stays available in Quick Run (reworked back in) -->
+            <div class="field" id="wrapInterestRate">
               <label>Interest Rate (%)</label>
+              <!-- Base 7.25, increments 0.05 (wired in JS) -->
               <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
             </div>
 
@@ -328,39 +394,33 @@
               <input id="basis" type="number" step="0.5" min="-100" max="100" inputmode="decimal" />
             </div>
 
-            <div class="field" id="wrapHeadOwned">
-              <label>Head Owned (Total × Ownership)</label>
-              <input id="headOwned" type="text" readonly value="—" />
-            </div>
+            <!-- Full head-owned field removed (replaced by tooltip under Ownership) -->
           </div>
         </div>
 
-        <div class="actions">
-          <button class="bigBtn secondary" id="resetBtn">Reset</button>
-        </div>
-
         <div class="error" id="errorText"></div>
+        <div style="margin-top:10px;">
+          <button class="secondary" id="resetBtn" type="button">Reset</button>
+        </div>
       </section>
 
       <!-- RESULTS -->
-      <section class="card resultsCard">
+      <section class="card resultsCard" aria-label="Results">
         <div class="cardHeader">
           <h2>Results</h2>
           <div class="headerActions">
-            <button id="shareScenarioBtn" class="smallBtn" type="button">Share Scenario</button>
-            <button id="downloadPdfBtn" class="smallBtn primary" type="button">Download PDF</button>
+            <!-- Download PDF moved next to Results title -->
+            <button id="downloadPdfBtn" class="primary" type="button">Download PDF</button>
+            <!-- Optional: share button (logic in JS later) -->
+            <button id="shareScenarioBtn" type="button">Share Scenario</button>
           </div>
         </div>
 
         <div class="resultsGrid" id="resultsGrid">
+          <!-- Always visible -->
           <div class="metric" id="tilePlPerHd">
             <div class="k">P/L per head</div>
             <div class="v" id="plPerHd">—</div>
-          </div>
-
-          <div class="metric" id="tileTotalPL">
-            <div class="k">Projected Total P/L</div>
-            <div class="v" id="projectedTotalPL">—</div>
           </div>
 
           <div class="metric" id="tilePlPerCwt">
@@ -368,6 +428,7 @@
             <div class="v" id="plPerCwt">—</div>
           </div>
 
+          <!-- Quick Run: add Break-even + Sales Price (so keep them available) -->
           <div class="metric small" id="tileBreakEven">
             <div class="k">Break-even</div>
             <div class="v" id="breakEvenCwt">—</div>
@@ -376,6 +437,12 @@
           <div class="metric small" id="tileSalesPrice">
             <div class="k">Sales Price (Futures + Basis)</div>
             <div class="v" id="salesPrice">—</div>
+          </div>
+
+          <!-- Full mode only -->
+          <div class="metric" id="tileTotalPL">
+            <div class="k">Projected Total P/L</div>
+            <div class="v" id="projectedTotalPL">—</div>
           </div>
 
           <div class="metric" id="tileCapitalInvested">
@@ -440,6 +507,119 @@
     </div>
   </div>
 
+  <!-- Hidden “PDF executive layout” template (JS will render to PDF to match your spec) -->
+  <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true">
+    <!-- 1) Header -->
+    <div id="pdfHeader">
+      <div id="pdfHeaderBar" style="height:32px;background:var(--cms);"></div>
+      <div style="padding:14px 16px;">
+        <div style="font-weight:900;font-size:18px;">CMS Breakeven Calculator</div>
+        <div style="margin-top:2px;color:var(--muted);font-size:12px;font-weight:900;">Lot Economics Summary</div>
+
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;color:var(--muted);font-size:12px;">
+          <div>In Date: <span id="pdf_inDate" style="color:#0f172a;font-weight:900;">—</span></div>
+          <div>Out Date: <span id="pdf_outDate" style="color:#0f172a;font-weight:900;">—</span></div>
+          <div>Days on Feed: <span id="pdf_dof" style="color:#0f172a;font-weight:900;">—</span></div>
+          <div>Head Owned: <span id="pdf_headOwned" style="color:#0f172a;font-weight:900;">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2) Results Snapshot -->
+    <div id="pdfSnapshot" style="padding:0 16px 12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
+          <div style="font-size:28px;font-weight:900;" id="pdf_plPerHead">—</div>
+          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">P/L PER HEAD</div>
+
+          <div style="height:10px;"></div>
+
+          <div style="font-size:22px;font-weight:900;" id="pdf_totalPL">—</div>
+          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">TOTAL P/L</div>
+        </div>
+
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
+          <div style="font-size:22px;font-weight:900;" id="pdf_breakEven">—</div>
+          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">BREAK-EVEN</div>
+
+          <div style="height:10px;"></div>
+
+          <div style="font-size:22px;font-weight:900;" id="pdf_salePrice">—</div>
+          <div style="color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.3px;">PROJECTED SALE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3) Performance Metrics Row -->
+    <div id="pdfPerfRow" style="padding:0 16px 12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
+          <div style="color:var(--muted);font-size:11px;font-weight:900;">ROE</div>
+          <div style="font-size:16px;font-weight:900;" id="pdf_roe">—</div>
+        </div>
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
+          <div style="color:var(--muted);font-size:11px;font-weight:900;">ANNUALIZED ROE</div>
+          <div style="font-size:16px;font-weight:900;" id="pdf_aroe">—</div>
+        </div>
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:10px;">
+          <div style="color:var(--muted);font-size:11px;font-weight:900;">IRR</div>
+          <div style="font-size:16px;font-weight:900;" id="pdf_irr">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4) Cost & Capital Summary -->
+    <div id="pdfCostCapital" style="padding:0 16px 12px;">
+      <div style="background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;font-size:12px;">
+          <div style="color:var(--muted);font-weight:900;">Capital Invested:</div>
+          <div style="text-align:right;font-weight:900;" id="pdf_capital">—</div>
+
+          <div style="color:var(--muted);font-weight:900;">Cattle Sales:</div>
+          <div style="text-align:right;font-weight:900;" id="pdf_sales">—</div>
+
+          <div style="color:var(--muted);font-weight:900;">Net Margin / cwt:</div>
+          <div style="text-align:right;font-weight:900;" id="pdf_marginCwt">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5) Inputs (de-emphasized) -->
+    <div id="pdfInputs" style="padding:0 16px 16px;">
+      <div style="color:var(--muted);font-size:12px;font-weight:900;margin-bottom:8px;">Inputs</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;">
+          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Weights &amp; Performance</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);">
+            <div>In Weight:</div><div style="font-weight:900;color:#0f172a;" id="pdf_inWt">—</div>
+            <div>Out Weight:</div><div style="font-weight:900;color:#0f172a;" id="pdf_outWt">—</div>
+            <div>ADG:</div><div style="font-weight:900;color:#0f172a;" id="pdf_adg">—</div>
+            <div>Death Loss:</div><div style="font-weight:900;color:#0f172a;" id="pdf_dl">—</div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;">
+          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Pricing Assumptions</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);">
+            <div>Purchase:</div><div style="font-weight:900;color:#0f172a;" id="pdf_purchase">—</div>
+            <div>COG:</div><div style="font-weight:900;color:#0f172a;" id="pdf_cog">—</div>
+            <div>Futures:</div><div style="font-weight:900;color:#0f172a;" id="pdf_fut">—</div>
+            <div>Basis:</div><div style="font-weight:900;color:#0f172a;" id="pdf_basis">—</div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;grid-column:1 / -1;">
+          <div style="font-size:12px;font-weight:900;color:#0f172a;margin-bottom:6px;">Financing</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:12px;color:var(--muted);max-width:320px;">
+            <div>Interest Rate:</div><div style="font-weight:900;color:#0f172a;" id="pdf_ir">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- app.js will be provided/updated in the next response -->
   <script src="./app.js"></script>
 </body>
 </html>
