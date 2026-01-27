@@ -2,7 +2,10 @@
   const $ = (id) => document.getElementById(id);
   const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
 
-  // -------- Format helpers --------
+  // ====== State ======
+  let quickRun = false;
+
+  // ====== Format helpers ======
   function money(x) {
     if (!isFinite(x)) return "—";
     return "$" + x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -12,7 +15,7 @@
   const pct         = (x) => isFinite(x) ? (x * 100).toFixed(2) + "%" : "—";
   const fmtNum      = (x, d=2) => isFinite(x) ? Number(x).toFixed(d) : "—";
 
-  // -------- Parse helpers --------
+  // ====== Parse helpers ======
   function numOrNaN(id) {
     const raw = String($(id)?.value ?? "").trim();
     if (raw === "") return NaN;
@@ -34,7 +37,7 @@
   function clearError(){ setText("errorText",""); }
   function softError(msg){ setText("errorText", msg || ""); }
 
-  // -------- Status coloring --------
+  // ====== Status coloring ======
   function applyStatus(plPerHd){
     const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
     tiles.forEach(t => t.classList.remove("good","mid","bad"));
@@ -43,14 +46,14 @@
     tiles.forEach(t => t.classList.add(cls));
   }
 
-  // -------- Derived displays --------
+  // ====== Derived displays ======
   function updateHeadOwned(){
     const totalHead = numOrNaN("totalHead");
     const ownershipPct = numOrNaN("ownershipPct");
     const el = $("headOwned");
     if (!el) return;
 
-    if (isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct >= 0) {
+    if (!quickRun && isFinite(totalHead) && totalHead > 0 && isFinite(ownershipPct) && ownershipPct >= 0) {
       const myHead = totalHead * (ownershipPct / 100.0);
       el.value = myHead.toLocaleString(undefined, { maximumFractionDigits: 2 });
       setText("d_myHead", el.value);
@@ -89,7 +92,7 @@
     return null;
   }
 
-  // -------- Outputs reset --------
+  // ====== Outputs reset ======
   function resetOutputs(){
     ["plPerHd","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
      "capitalInvested","cattleSales","roe","annualRoe","irr",
@@ -98,7 +101,7 @@
     ].forEach(id => setText(id, "—"));
   }
 
-  // -------- IRR (two-point) --------
+  // ====== IRR (two-point) ======
   function irrTwoPoint(c0, c1, d0, d1) {
     const msPerDay = 24 * 60 * 60 * 1000;
     const t = (d1 - d0) / msPerDay / 365.0;
@@ -108,7 +111,34 @@
     return NaN;
   }
 
-  // -------- Main calc --------
+  // ====== Quick Run UI toggle ======
+  function applyQuickRunUI(){
+    $("quickRunBtn").textContent = `Quick Run: ${quickRun ? "ON" : "OFF"}`;
+
+    // Hide inputs
+    $("wrapTotalHead").classList.toggle("hidden", quickRun);
+    $("wrapOwnershipPct").classList.toggle("hidden", quickRun);
+    $("wrapInterestRate").classList.toggle("hidden", quickRun);
+    $("wrapHeadOwned").classList.toggle("hidden", quickRun);
+
+    // Hide results tiles
+    const hide = (id, shouldHide) => { const el = $(id); if (el) el.classList.toggle("hidden", shouldHide); };
+
+    // In quick run, only show P/L per head and P/L per cwt
+    hide("tileTotalPL", quickRun);
+    hide("tileBreakEven", quickRun);
+    hide("tileSalesPrice", quickRun);
+    hide("tileCapitalInvested", quickRun);
+    hide("tileCattleSales", quickRun);
+    hide("tileRoe", quickRun);
+    hide("tileAnnualRoe", quickRun);
+    hide("tileIrr", quickRun);
+    $("detailsPanel").classList.toggle("hidden", quickRun);
+
+    // Also remove Total PL color tile effect if hidden (fine either way)
+  }
+
+  // ====== Main calc ======
   function updateAll(){
     clearError();
     updateHeadOwned();
@@ -116,12 +146,17 @@
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
-    // Equity fixed 30%
+    // Equity fixed 30% (not used in Quick Run results, but fine)
     const equityUsed = 0.30;
 
     // Inputs
     const daysOnFeed = numOrNaN("daysOnFeed");
-    const interestRatePct = numOrNaN("interestRatePct"); // typed on web, picker on mobile
+
+    // Interest:
+    // - Normal mode: use entered interest
+    // - Quick Run: ignore interest (treat as 0)
+    const interestRatePctRaw = numOrNaN("interestRatePct");
+    const interestRatePct = quickRun ? 0 : interestRatePctRaw;
     const interestRate = interestRatePct / 100.0;
 
     const totalHead = numOrNaN("totalHead");
@@ -173,6 +208,7 @@
     const feedCost = gained * cogNoInterest;
     const perHdCOG = feedCost + deadLossDollars;
 
+    // Interest per hd (0 in Quick Run)
     const interestPerHd =
       (((costPerHd + (0.5 * perHdCOG)) * interestRate) / 365.0) * daysOnFeed;
 
@@ -193,6 +229,8 @@
       setText("salesPrice","—");
       setText("plPerCwt","—");
       setText("plPerHd","—");
+
+      // In Quick Run, that’s basically all we show
       setText("projectedTotalPL","—");
       setText("capitalInvested","—");
       setText("cattleSales","—");
@@ -216,7 +254,20 @@
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
 
-    // Totals
+    // If Quick Run: stop here (no totals, no ROE, no IRR)
+    if (quickRun) {
+      setText("projectedTotalPL","—");
+      setText("capitalInvested","—");
+      setText("cattleSales","—");
+      setText("roe","—");
+      setText("annualRoe","—");
+      setText("irr","—");
+      setText("d_equityBase","—");
+      applyStatus(plPerHd);
+      return;
+    }
+
+    // Totals (normal mode)
     const haveTotals = isFinite(totalHead) && totalHead > 0 && isFinite(ownership) && ownership > 0;
     if (!haveTotals) {
       setText("projectedTotalPL","—");
@@ -260,7 +311,7 @@
     applyStatus(plPerHd);
   }
 
-  // ================== Mobile wheel picker (only for phones) ==================
+  // ================== Mobile wheel picker (phones only) ==================
   const overlay = $("pickerOverlay");
   const wheel = $("pickerWheel");
   const titleEl = $("pickerTitle");
@@ -270,7 +321,6 @@
   let pickerState = null; // { inputEl, title, values:[{label,value}], selectedIndex }
 
   function isPhoneLike() {
-    // Prefer “phone” experience on coarse pointers OR small screens
     return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 700;
   }
 
@@ -323,14 +373,14 @@
   }, { passive: true });
 
   function openPicker(inputEl, cfg) {
-    if (!isPhoneLike()) return; // web view: type normally
+    if (!isPhoneLike()) return; // desktop/web = type normally
 
     const { title, values, defaultValue } = cfg;
 
     let current = String(inputEl.value ?? "").trim();
     if (!current) current = String(defaultValue);
 
-    let selectedIndex = values.findIndex(v => v.label === current || String(v.value) === current);
+    let selectedIndex = values.findIndex(v => v.label === current);
     if (selectedIndex < 0) selectedIndex = 0;
 
     pickerState = { inputEl, title, values, selectedIndex };
@@ -371,7 +421,6 @@
     return vals;
   }
 
-  // Attach mobile pickers to fields (but keep them typeable on web)
   function attachMobilePicker(id, cfg) {
     const el = $(id);
     if (!el) return;
@@ -381,7 +430,115 @@
     el.addEventListener("click", () => openPicker(el, cfg));
   }
 
-  // -------- Reset --------
+  // ================== PDF generation ==================
+  function sanitizeFilename(name) {
+    return String(name).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+  }
+
+  function getInputValueLabel(id) {
+    const el = $(id);
+    if (!el) return "—";
+    const v = String(el.value ?? "").trim();
+    return v ? v : "—";
+  }
+
+  function downloadPdf() {
+    // Ensure latest numbers are on screen
+    updateAll();
+
+    const scenario = prompt("Scenario name for this PDF?");
+    if (scenario === null) return; // cancelled
+    const title = sanitizeFilename(scenario) || "Scenario";
+
+    const jsPDF = window.jspdf?.jsPDF;
+    if (!jsPDF) {
+      alert("PDF library not loaded. Check your internet connection or the jsPDF script tag.");
+      return;
+    }
+
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+
+    const margin = 44;
+    let y = margin;
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(title, margin, y);
+    y += 18;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text("CMS Breakeven Calculator", margin, y);
+    y += 18;
+
+    // Helper to write section
+    function section(label) {
+      y += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(label, margin, y);
+      y += 10;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+    }
+
+    function row(k, v) {
+      const left = `${k}:`;
+      const right = String(v ?? "—");
+      const maxWidth = 540;
+      doc.setFont("helvetica", "bold");
+      doc.text(left, margin, y, { maxWidth: 200 });
+      doc.setFont("helvetica", "normal");
+      doc.text(right, margin + 170, y, { maxWidth: maxWidth - 170 });
+      y += 16;
+
+      if (y > 740) { doc.addPage(); y = margin; }
+    }
+
+    // Inputs
+    section("Inputs");
+    row("In Date", getInputValueLabel("inDate"));
+    row("Days on Feed", getInputValueLabel("daysOnFeed"));
+    row("ADG", getInputValueLabel("adg"));
+    row("Out Date", getInputValueLabel("outDateInline"));
+    row("In Weight (lb)", getInputValueLabel("inWeight"));
+    row("Out Weight (lb)", getInputValueLabel("outWeight"));
+    row("Purchase Price ($/cwt)", getInputValueLabel("priceCwt"));
+    row("Projected COG ($/lb gain)", getInputValueLabel("cogNoInterest"));
+    row("Death Loss (%)", getInputValueLabel("deathLossPct"));
+    row("Futures ($/cwt)", getInputValueLabel("futures"));
+    row("Expected Basis ($/cwt)", getInputValueLabel("basis"));
+
+    if (!quickRun) {
+      row("Total Head", getInputValueLabel("totalHead"));
+      row("Ownership (%)", getInputValueLabel("ownershipPct"));
+      row("Head Owned", getInputValueLabel("headOwned"));
+      row("Interest Rate (%)", getInputValueLabel("interestRatePct"));
+    } else {
+      row("Mode", "Quick Run (interest excluded)");
+    }
+
+    // Results
+    section("Results");
+    row("P/L per head", $("plPerHd")?.textContent || "—");
+    row("P/L per cwt", $("plPerCwt")?.textContent || "—");
+
+    if (!quickRun) {
+      row("Projected Total P/L", $("projectedTotalPL")?.textContent || "—");
+      row("Break-even", $("breakEvenCwt")?.textContent || "—");
+      row("Sales Price", $("salesPrice")?.textContent || "—");
+      row("Capital Invested", $("capitalInvested")?.textContent || "—");
+      row("Cattle Sales", $("cattleSales")?.textContent || "—");
+      row("ROE", $("roe")?.textContent || "—");
+      row("Annualized ROE", $("annualRoe")?.textContent || "—");
+      row("IRR", $("irr")?.textContent || "—");
+    }
+
+    doc.save(`${title}.pdf`);
+  }
+
+  // ====== Reset ======
   function resetAll() {
     ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"].forEach(id => { if ($(id)) $(id).value = ""; });
 
@@ -393,8 +550,8 @@
 
     if ($("ownershipPct")) $("ownershipPct").value = "100";
 
-    // defaults for typed fields
-    if ($("interestRatePct")) $("interestRatePct").value = "7.5";
+    // defaults
+    if ($("interestRatePct")) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
     if ($("basis")) $("basis").value = "0.0";
@@ -409,8 +566,9 @@
     updateAll();
   }
 
-  // -------- Init --------
+  // ====== Init ======
   window.addEventListener("DOMContentLoaded", () => {
+    // defaults
     const t = new Date();
     const yyyy = t.getFullYear();
     const mm = String(t.getMonth()+1).padStart(2,"0");
@@ -418,28 +576,23 @@
     if ($("inDate") && !$("inDate").value) $("inDate").value = `${yyyy}-${mm}-${dd}`;
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
 
-    // defaults
-    if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.5";
+    if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
     if ($("basis") && !$("basis").value) $("basis").value = "0.0";
 
-    // Mobile picker lists:
-    // Interest: 0–25 in 0.5 steps
-    const irVals  = rangeValues({ start: 0.0, end: 25.0, step: 0.5, decimals: 1 });
-    // COG: 0.75–1.50 in 0.01 steps
+    // Mobile picker lists (0.05 increments for interest)
+    const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
-    // Death loss: 0–100 in 0.5 steps
-    const dlVals  = rangeValues({ start: 0.0, end: 100.0, step: 0.5, decimals: 1 });
-    // Basis: -100–100 in 0.5 steps
+    const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
     const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 0.5, decimals: 1 });
 
-    attachMobilePicker("interestRatePct", { title:"Interest Rate (%)", values: irVals, defaultValue: 7.5 });
+    attachMobilePicker("interestRatePct", { title:"Interest Rate (%)", values: irVals, defaultValue: 7.25 });
     attachMobilePicker("cogNoInterest",   { title:"Projected COG", values: cogVals, defaultValue: 1.10 });
     attachMobilePicker("deathLossPct",    { title:"Death Loss (%)", values: dlVals, defaultValue: 1.0 });
     attachMobilePicker("basis",           { title:"Expected Basis", values: bVals, defaultValue: 0.0 });
 
-    // Auto-calc on standard inputs
+    // Auto-calc on inputs
     const ids = ["inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures",
                  "interestRatePct","cogNoInterest","deathLossPct","basis"];
     ids.forEach(id => {
@@ -449,8 +602,31 @@
       el.addEventListener("change", updateAll);
     });
 
+    // Buttons
     $("resetBtn")?.addEventListener("click", resetAll);
+
+    $("quickRunBtn")?.addEventListener("click", () => {
+      quickRun = !quickRun;
+      applyQuickRunUI();
+      updateAll();
+    });
+
+    $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
+
+    applyQuickRunUI();
     updateAll();
   });
+
+  // helper to build ranges for wheel picker
+  function rangeValues({ start, end, step, decimals }) {
+    const vals = [];
+    const n = Math.round((end - start) / step);
+    for (let i = 0; i <= n; i++) {
+      const v = start + i * step;
+      const value = Number(v.toFixed(decimals));
+      vals.push({ value, label: value.toFixed(decimals) });
+    }
+    return vals;
+  }
 
 })();
