@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
 
+  <!-- jsPDF for PDF generation -->
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
   <style>
     :root{
       --cms:#336699;
@@ -15,7 +18,7 @@
       --soft:#eef2f7;
       --disabled:#f2f4f8;
 
-      --results-bg:#eaf2fb; /* lighter blue for results panel */
+      --results-bg:#eaf2ff;
 
       --good-bg:#ecfdf5; --good-bd:#10b981; --good-tx:#065f46;
       --mid-bg:#fffbeb;  --mid-bd:#f59e0b;  --mid-tx:#92400e;
@@ -31,11 +34,31 @@
     }
 
     header{
-      padding:16px;
+      padding:14px 16px;
       background:var(--cms);
       color:#fff;
     }
+    .headerRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      max-width:1200px;
+      margin:0 auto;
+    }
     header h1{ margin:0; font-size:18px; font-weight:900; }
+    .topActions{ display:flex; gap:10px; flex-wrap:wrap; }
+    .topActions button{
+      border:0;
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:13px;
+      background:rgba(255,255,255,.16);
+      color:#fff;
+    }
+    .topActions button:hover{ background:rgba(255,255,255,.22); }
 
     main{ max-width:1200px; margin:0 auto; padding:14px; }
 
@@ -56,10 +79,10 @@
       box-shadow:0 2px 10px rgba(15,23,42,.06);
       min-width:0;
     }
+    .resultsCard{
+      background:var(--results-bg);
+    }
     .card h2{ margin:0 0 10px; font-size:15px; }
-
-    /* results panel background */
-    .card.results{ background:var(--results-bg); }
 
     label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
 
@@ -83,7 +106,7 @@
 
     .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 0; align-items:center; }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
     button{
       border:0;
       border-radius:12px;
@@ -95,15 +118,6 @@
     .secondary{ background:#e8eef7; color:#0f172a; }
     .primary{ background:var(--cms); color:#fff; }
 
-    .topbar{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-bottom:10px;
-      align-items:center;
-      justify-content:flex-start;
-    }
-
     /* Web layout: two columns INSIDE inputs card */
     .inputsGrid{
       display:grid;
@@ -114,6 +128,7 @@
       .inputsGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     }
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+    .hidden{ display:none !important; }
 
     /* Results */
     .resultsGrid{
@@ -127,7 +142,7 @@
 
     .metric{
       padding:10px 12px;
-      border:1px solid rgba(15,23,42,.10);
+      border:1px solid #e5eaf3;
       border-radius:12px;
       background:#fff;
       min-width:0;
@@ -154,7 +169,7 @@
       overflow:hidden;
     }
     .calc-table td{
-      padding:8px 10px;
+      padding:8px 6px;
       border-bottom:1px solid var(--soft);
       vertical-align:top;
       word-break:break-word;
@@ -162,33 +177,85 @@
     .calc-table td:first-child{ color:var(--muted); width:60%; }
     .calc-table td:last-child{ text-align:right; font-weight:900; }
 
-    /* Quick run hides */
-    .hidden{ display:none !important; }
-  </style>
+    /* iOS-style picker modal (mobile only) */
+    .overlay{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.55);
+      display:flex; align-items:flex-end; justify-content:center;
+      z-index:1000; padding:10px;
+    }
+    .overlay.hidden{ display:none; }
 
-  <!-- jsPDF (free, client-side) -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    .picker{
+      width:min(560px, 100%);
+      background:#0b0f19;
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 18px 60px rgba(0,0,0,.55);
+    }
+    .pickerTop{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 12px;
+      background:rgba(255,255,255,.06);
+      color:#fff;
+    }
+    .pickerTop .title{ font-weight:900; font-size:14px; opacity:.95; }
+    .pickerTop button{
+      background:transparent; color:#fff; font-weight:900;
+      padding:8px 10px; border-radius:12px;
+    }
+    .pickerTop button:hover{ background:rgba(255,255,255,.08); }
+
+    .wheelWrap{ position:relative; height:240px; }
+    .wheel{
+      height:240px;
+      overflow:auto;
+      scroll-snap-type:y mandatory;
+      -webkit-overflow-scrolling:touch;
+      padding:84px 0;
+      background:linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.2) 30%, rgba(0,0,0,.2) 70%, rgba(0,0,0,.8));
+    }
+    .wheel::-webkit-scrollbar{ width:0; height:0; }
+    .wheelItem{
+      height:42px;
+      display:flex; align-items:center; justify-content:center;
+      scroll-snap-align:center;
+      font-size:34px; font-weight:800;
+      color:rgba(255,255,255,.38);
+      user-select:none;
+    }
+    .selectorBand{
+      position:absolute; left:12px; right:12px;
+      top:50%; transform:translateY(-50%);
+      height:52px; border-radius:26px;
+      background:rgba(255,255,255,.10);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+      pointer-events:none;
+    }
+    .wheelItem.active{ color:rgba(255,255,255,.95); }
+  </style>
 </head>
 
 <body>
-  <header><h1>CMS Breakeven Calculator</h1></header>
+  <header>
+    <div class="headerRow">
+      <h1>CMS Breakeven Calculator</h1>
+      <div class="topActions">
+        <button id="quickRunBtn" type="button">Quick Run: OFF</button>
+        <button id="downloadPdfBtn" type="button">Download PDF</button>
+      </div>
+    </div>
+  </header>
 
   <main>
     <div class="grid">
 
       <!-- INPUTS -->
       <section class="card">
-        <div class="topbar">
-          <button class="primary" id="quickRunBtn" type="button">Quick Run: OFF</button>
-          <button class="secondary" id="downloadPdfBtn" type="button">Download PDF</button>
-          <button class="secondary" id="resetBtn" type="button">Reset</button>
-        </div>
-
         <h2>Inputs</h2>
 
         <div class="inputsGrid">
-          <!-- LEFT COLUMN (your order) -->
+          <!-- LEFT COLUMN -->
           <div class="col">
             <div class="field">
               <label>In Date</label>
@@ -231,7 +298,7 @@
             </div>
           </div>
 
-          <!-- RIGHT COLUMN (your order) -->
+          <!-- RIGHT COLUMN -->
           <div class="col">
             <div class="field">
               <label>Days on Feed</label>
@@ -270,14 +337,17 @@
           </div>
         </div>
 
+        <div class="actions">
+          <button class="secondary" id="resetBtn">Reset</button>
+        </div>
         <div class="error" id="errorText"></div>
       </section>
 
       <!-- RESULTS -->
-      <section class="card results">
+      <section class="card resultsCard">
         <h2>Results</h2>
 
-        <div class="resultsGrid">
+        <div class="resultsGrid" id="resultsGrid">
           <div class="metric" id="tilePlPerHd">
             <div class="k">P/L per head</div>
             <div class="v" id="plPerHd">—</div>
@@ -293,43 +363,43 @@
             <div class="v" id="plPerCwt">—</div>
           </div>
 
-          <div class="metric small" id="wrapBreakEven">
+          <div class="metric small" id="tileBreakEven">
             <div class="k">Break-even</div>
             <div class="v" id="breakEvenCwt">—</div>
           </div>
 
-          <div class="metric small" id="wrapSalesPrice">
+          <div class="metric small" id="tileSalesPrice">
             <div class="k">Sales Price (Futures + Basis)</div>
             <div class="v" id="salesPrice">—</div>
           </div>
 
-          <div class="metric" id="wrapCapitalInvested">
+          <div class="metric" id="tileCapitalInvested">
             <div class="k">Capital Invested</div>
             <div class="v" id="capitalInvested">—</div>
           </div>
 
-          <div class="metric" id="wrapCattleSales">
+          <div class="metric" id="tileCattleSales">
             <div class="k">Cattle Sales</div>
             <div class="v" id="cattleSales">—</div>
           </div>
 
-          <div class="metric" id="wrapRoe">
+          <div class="metric" id="tileRoe">
             <div class="k">Return on Equity (ROE)</div>
             <div class="v" id="roe">—</div>
           </div>
 
-          <div class="metric" id="wrapAnnualRoe">
+          <div class="metric" id="tileAnnualRoe">
             <div class="k">Annualized ROE</div>
             <div class="v" id="annualRoe">—</div>
           </div>
 
-          <div class="metric" id="wrapIrr">
+          <div class="metric" id="tileIrr">
             <div class="k">IRR</div>
             <div class="v" id="irr">—</div>
           </div>
         </div>
 
-        <details id="detailsBlock">
+        <details id="detailsPanel">
           <summary>Calculation Details</summary>
           <table class="calc-table">
             <tbody>
@@ -349,6 +419,21 @@
 
     </div>
   </main>
+
+  <!-- Mobile Picker Modal -->
+  <div id="pickerOverlay" class="overlay hidden" aria-hidden="true">
+    <div class="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+      <div class="pickerTop">
+        <button id="pickerCancel" type="button">Cancel</button>
+        <div class="title" id="pickerTitle">Pick</div>
+        <button id="pickerDone" type="button">Done</button>
+      </div>
+      <div class="wheelWrap">
+        <div class="selectorBand"></div>
+        <div id="pickerWheel" class="wheel"></div>
+      </div>
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 </body>
