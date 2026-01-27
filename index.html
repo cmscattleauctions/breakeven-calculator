@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CMS Breakeven Calculator</title>
 
-  <!-- jsPDF for PDF generation -->
+  <!-- jsPDF for PDF generation (no server needed) -->
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
@@ -59,9 +59,7 @@
       box-shadow:0 2px 10px rgba(15,23,42,.06);
       min-width:0;
     }
-    .resultsCard{
-      background:var(--results-bg);
-    }
+    .resultsCard{ background:var(--results-bg); }
 
     .cardHeader{
       display:flex;
@@ -71,20 +69,20 @@
       margin-bottom:10px;
     }
     .cardHeader h2{ margin:0; font-size:15px; }
-    .headerActions{ display:flex; gap:8px; flex-wrap:wrap; }
+    .headerActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
-    button{
+    .toggleBtn, .smallBtn{
       border:0;
       border-radius:12px;
-      padding:10px 12px;
+      padding:8px 10px;
       font-weight:900;
       cursor:pointer;
       font-size:13px;
     }
-    .secondary{ background:#e8eef7; color:#0f172a; }
-    .primary{ background:var(--cms); color:#fff; }
-    .ghost{ background:rgba(15,23,42,.06); color:#0f172a; }
-    .toggleOn{ background:#0f172a; color:#fff; }
+    .toggleBtn{ background:#e8eef7; color:#0f172a; }
+    .toggleBtn.on{ background:var(--cms); color:#fff; }
+    .smallBtn{ background:rgba(51,102,153,.12); color:#0f172a; }
+    .smallBtn.primary{ background:var(--cms); color:#fff; }
 
     label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
 
@@ -106,6 +104,19 @@
       cursor:default;
     }
 
+    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+    button.bigBtn{
+      border:0;
+      border-radius:12px;
+      padding:11px 14px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:14px;
+    }
+    .secondary{ background:#e8eef7; color:#0f172a; }
+
+    /* Inputs layout */
     .inputsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -116,10 +127,6 @@
     }
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
     .hidden{ display:none !important; }
-
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; align-items:center; }
-
-    .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
     /* Results */
     .resultsGrid{
@@ -194,6 +201,7 @@
     .pickerTop button{
       background:transparent; color:#fff; font-weight:900;
       padding:8px 10px; border-radius:12px;
+      border:0; cursor:pointer;
     }
     .pickerTop button:hover{ background:rgba(255,255,255,.08); }
 
@@ -228,7 +236,9 @@
 </head>
 
 <body>
-  <header><h1>CMS Breakeven Calculator</h1></header>
+  <header>
+    <h1>CMS Breakeven Calculator</h1>
+  </header>
 
   <main>
     <div class="grid">
@@ -238,7 +248,7 @@
         <div class="cardHeader">
           <h2>Inputs</h2>
           <div class="headerActions">
-            <button id="quickRunBtn" type="button" class="ghost">Quick Run: OFF</button>
+            <button id="quickRunBtn" class="toggleBtn" type="button">Quick Run: OFF</button>
           </div>
         </div>
 
@@ -303,7 +313,7 @@
               <input id="outDateInline" type="text" readonly value="—" />
             </div>
 
-            <div class="field" id="wrapInterestRate">
+            <div class="field">
               <label>Interest Rate (%)</label>
               <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
             </div>
@@ -326,8 +336,9 @@
         </div>
 
         <div class="actions">
-          <button class="secondary" id="resetBtn">Reset</button>
+          <button class="bigBtn secondary" id="resetBtn">Reset</button>
         </div>
+
         <div class="error" id="errorText"></div>
       </section>
 
@@ -336,8 +347,8 @@
         <div class="cardHeader">
           <h2>Results</h2>
           <div class="headerActions">
-            <button id="shareScenarioBtn" type="button" class="ghost">Share Scenario</button>
-            <button id="downloadPdfBtn" type="button" class="primary">Download PDF</button>
+            <button id="shareScenarioBtn" class="smallBtn" type="button">Share Scenario</button>
+            <button id="downloadPdfBtn" class="smallBtn primary" type="button">Download PDF</button>
           </div>
         </div>
 
@@ -363,7 +374,7 @@
           </div>
 
           <div class="metric small" id="tileSalesPrice">
-            <div class="k">Projected Sale (Futures + Basis)</div>
+            <div class="k">Sales Price (Futures + Basis)</div>
             <div class="v" id="salesPrice">—</div>
           </div>
 
@@ -378,7 +389,7 @@
           </div>
 
           <div class="metric" id="tileRoe">
-            <div class="k">ROE</div>
+            <div class="k">Return on Equity (ROE)</div>
             <div class="v" id="roe">—</div>
           </div>
 
