@@ -1,0 +1,5 @@
+// ✅ FILE 1: /config.json  (create this at the root of your GitHub Pages repo)
+{
+  "interestRatePresets": [6.25, 6.75, 7.25],
+  "defaultPresetIndex": 1
+}
