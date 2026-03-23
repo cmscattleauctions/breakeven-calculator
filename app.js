@@ -4,6 +4,7 @@
 
   // ===================== State =====================
   let quickRun = false;
+  const BASIS_DEFAULT = 0;
 
   // ===================== Formatting =====================
   function money(x) {
@@ -50,6 +51,24 @@
 
   function clearError(){ setText("errorText",""); }
   function softError(msg){ setText("errorText", msg || ""); }
+
+  // ===================== Basis normalization =====================
+  function normalizeBasisValue(raw) {
+    const s = String(raw ?? "").trim();
+    if (s === "" || s === "-30" || s === "-30.0" || s === "-30.00") return String(BASIS_DEFAULT);
+
+    const n = Number(s);
+    if (!isFinite(n)) return String(BASIS_DEFAULT);
+
+    // Basis picker uses whole-dollar increments
+    return String(Math.round(n));
+  }
+
+  function ensureBasisDefault() {
+    const basisEl = $("basis");
+    if (!basisEl) return;
+    basisEl.value = normalizeBasisValue(basisEl.value);
+  }
 
   // ===================== Status coloring =====================
   function applyStatus(plPerHd){
@@ -147,7 +166,6 @@
 
     if (!tile || !val || !label) return;
 
-    // Only in Full mode
     const show = !quickRun;
     tile.classList.toggle("hidden", !show);
 
@@ -158,7 +176,6 @@
       return;
     }
 
-    // Display with 2 decimals
     const shown = info.contracts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     label.textContent = `${info.kind} Contracts Needed`;
     val.textContent = shown;
@@ -180,14 +197,10 @@
       btn.setAttribute("data-on", quickRun ? "true" : "false");
     }
 
-    // Hide inputs in quick run (interest stays visible)
     $("wrapTotalHead")?.classList.toggle("hidden", quickRun);
     $("wrapOwnershipPct")?.classList.toggle("hidden", quickRun);
-
-    // Head owned tooltip hidden in quick run
     $("wrapHeadOwnedTip")?.classList.toggle("hidden", quickRun);
 
-    // Results visibility
     const hide = (id, shouldHide) => { const el = $(id); if (el) el.classList.toggle("hidden", shouldHide); };
 
     hide("tileTotalPL", quickRun);
@@ -198,7 +211,6 @@
     hide("tileIrr", quickRun);
     $("detailsPanel")?.classList.toggle("hidden", quickRun);
 
-    // Contracts tile hidden by renderContractsUI as well; keep consistent:
     $("tileContractsNeeded")?.classList.toggle("hidden", quickRun);
   }
 
@@ -227,14 +239,14 @@
   function updateAll(){
     clearError();
 
+    ensureBasisDefault();
+
     updateADG();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
-    // Equity fixed 30%
     const equityUsed = 0.30;
 
-    // Inputs
     const daysOnFeed = numOrNaN("daysOnFeed");
     const interestRatePct = numOrNaN("interestRatePct");
     const interestRate = interestRatePct / 100.0;
@@ -253,10 +265,8 @@
     const futures = numOrNaN("futures");
     const basis = numOrNaN("basis");
 
-    // Head owned tooltip + value
     const myHeadFromTip = updateHeadOwnedTip();
 
-    // Guardrails
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
       softError("Days on Feed must be > 0.");
       resetOutputs(); applyStatus(NaN);
@@ -309,7 +319,6 @@
     setText("d_interestPerHd", money(interestPerHd));
     setText("d_totalCostPerHd", money(totalCostPerHd));
 
-    // Sales side
     if (!(isFinite(futures) && isFinite(basis))) {
       setText("salesPrice","—");
       setText("plPerCwt","—");
@@ -340,7 +349,6 @@
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
 
-    // Quick Run: NO contracts + NO totals
     if (quickRun) {
       setText("projectedTotalPL","—");
       setText("capitalInvested","—");
@@ -356,7 +364,6 @@
       return null;
     }
 
-    // Totals (full mode)
     const haveTotals = isFinite(totalHead) && totalHead > 0 && isFinite(ownership) && ownership > 0;
     if (!haveTotals) {
       setText("projectedTotalPL","—");
@@ -399,7 +406,6 @@
       setText("irr","—");
     }
 
-    // Contracts needed (full mode only)
     const cInfo = computeContractsNeeded(myHead, outWeight);
     renderContractsUI(cInfo, outWeight);
 
@@ -490,12 +496,31 @@
   function openPicker(inputEl, cfg) {
     if (!isPhoneLike()) return;
 
-    const { title, values, defaultValue } = cfg;
+    const { title, values, defaultValue, normalize } = cfg;
 
     let current = String(inputEl.value ?? "").trim();
+    if (typeof normalize === "function") current = String(normalize(current));
+
     if (!current) current = String(defaultValue);
 
-    let selectedIndex = values.findIndex(v => v.label === current);
+    let selectedIndex = -1;
+
+    const currentNum = Number(current);
+    if (isFinite(currentNum)) {
+      selectedIndex = values.findIndex(v => Number(v.value) === currentNum);
+    }
+
+    if (selectedIndex < 0) {
+      selectedIndex = values.findIndex(v => v.label === current);
+    }
+
+    if (selectedIndex < 0) {
+      const defNum = Number(defaultValue);
+      if (isFinite(defNum)) {
+        selectedIndex = values.findIndex(v => Number(v.value) === defNum);
+      }
+    }
+
     if (selectedIndex < 0) selectedIndex = 0;
 
     pickerState = { inputEl, title, values, selectedIndex };
@@ -540,7 +565,10 @@
     const el = $(id);
     if (!el) return;
     el.addEventListener("focus", (e) => {
-      if (isPhoneLike()) { e.target.blur(); openPicker(el, cfg); }
+      if (isPhoneLike()) {
+        e.target.blur();
+        openPicker(el, cfg);
+      }
     });
     el.addEventListener("click", () => openPicker(el, cfg));
   }
@@ -606,9 +634,11 @@
       const v = p.get(key);
       if (v !== null && $(id)) $(id).value = v;
     }
+
+    ensureBasisDefault();
   }
 
-  // ===================== PDF (tweaked per latest request) =====================
+  // ===================== PDF =====================
   function sanitizeFilename(name) {
     return String(name).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   }
@@ -620,7 +650,7 @@
   }
 
   function downloadPdf() {
-    updateAll(); // refresh UI first
+    updateAll();
 
     const scenario = prompt("Scenario name for this PDF?");
     if (scenario === null) return;
@@ -660,7 +690,6 @@
     const v_dof = strOrEmpty("daysOnFeed") || "—";
     const v_headOwned = quickRun ? "—" : ($("headOwnedTip")?.textContent || "—");
 
-    // Inputs
     const i_inWt = (strOrEmpty("inWeight") || "—") + " lb";
     const i_outWt = (strOrEmpty("outWeight") || "—") + " lb";
     const i_adg = (strOrEmpty("adg") || "—");
@@ -673,7 +702,6 @@
 
     const i_ir = (strOrEmpty("interestRatePct") || "—") + "%";
 
-    // ----- PDF drawing -----
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const W = 612;
     const margin = 42;
@@ -686,21 +714,17 @@
 
     const tc = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
 
-    // Header bar
     doc.setFillColor(cmsBlue[0], cmsBlue[1], cmsBlue[2]);
     doc.rect(0, 0, W, 34, "F");
 
-    // Main title = Scenario name
     let y = 34 + 20;
     doc.setFont("helvetica", "bold"); doc.setFontSize(18);
     tc(ink); doc.text(scenarioName, margin, y);
 
-    // Subtitle
     y += 16;
     doc.setFont("helvetica", "bold"); doc.setFontSize(11);
     tc(muted); doc.text("CMS Breakeven Calculator • Lot Economics Summary", margin, y);
 
-    // Meta row
     y += 18;
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
     tc(muted);
@@ -728,7 +752,6 @@
     doc.setFont("helvetica", "bold"); tc(ink);
     doc.text(String(v_headOwned), rightX + 66, y);
 
-    // Snapshot cards
     y += 18;
 
     const cardGap = 12;
@@ -741,7 +764,6 @@
     rrect(doc, c1x, cardY, cardW, cardH, 12, white, border);
     rrect(doc, c2x, cardY, cardW, cardH, 12, white, border);
 
-    // Left: PL per head big + PL/cwt
     doc.setFont("helvetica", "bold"); doc.setFontSize(28); tc(ink);
     doc.text(v_plHd.replace(" /hd",""), c1x + 14, cardY + 44);
 
@@ -754,24 +776,20 @@
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text("NET MARGIN / CWT", c1x + 14, cardY + 110);
 
-    // Right: Contracts + Total PL (Total PL styled like PL per head)
     const rightTopY = cardY + 26;
 
-    // Contracts value (smaller than Total PL now)
     doc.setFont("helvetica","bold"); doc.setFontSize(16); tc(ink);
     doc.text(quickRun ? "—" : v_contractsVal, c2x + 14, rightTopY);
 
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text(quickRun ? "CONTRACTS NEEDED" : v_contractsLabel.toUpperCase(), c2x + 14, rightTopY + 16);
 
-    // Total PL big (same feel as PL per head)
     doc.setFont("helvetica","bold"); doc.setFontSize(28); tc(ink);
     doc.text(quickRun ? "—" : String(v_totalPL), c2x + 14, cardY + 82);
 
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text("TOTAL P/L", c2x + 14, cardY + 100);
 
-    // Tooltip moved BELOW Total PL and made smaller
     doc.setFont("helvetica","normal"); doc.setFontSize(8); tc(muted);
     const tipText = quickRun
       ? "Contracts estimate shown only in Full mode."
@@ -780,7 +798,6 @@
 
     y = cardY + cardH + 14;
 
-    // Performance metrics row
     const perfH = 54;
     const perfY = y;
     const perfGap = 10;
@@ -806,7 +823,6 @@
 
     y = perfY + perfH + 14;
 
-    // Cost & Capital summary
     const ccY = y;
     const ccH = 74;
     rrect(doc, margin, ccY, W - margin*2, ccH, 12, white, border);
@@ -823,7 +839,6 @@
 
     y = ccY + ccH + 14;
 
-    // Inputs section
     doc.setFont("helvetica","bold"); doc.setFontSize(11); tc(muted);
     doc.text("Inputs", margin, y);
     y += 10;
@@ -863,7 +878,6 @@
 
     y = boxY + boxH + 12;
 
-    // Financing (full width)
     rrect(doc, margin, y, W - margin*2, 48, 10, white, border);
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
     doc.text("Financing", margin + 10, y + 18);
@@ -874,7 +888,6 @@
 
     y += 60;
 
-    // Break-even + Projected sale BELOW inputs
     rrect(doc, margin, y, W - margin*2, 56, 12, white, border);
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
     doc.text("Break-even:", margin + 14, y + 22);
@@ -897,11 +910,10 @@
 
     if ($("ownershipPct")) $("ownershipPct").value = "100";
 
-    // defaults
     if ($("interestRatePct")) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
-    if ($("basis")) $("basis").value = "0";
+    if ($("basis")) $("basis").value = String(BASIS_DEFAULT);
 
     if ($("adg")) $("adg").value = "—";
     if ($("outDateInline")) $("outDateInline").value = "—";
@@ -916,7 +928,6 @@
   window.addEventListener("DOMContentLoaded", () => {
     applyScenarioFromUrl();
 
-    // Defaults if empty
     const t = new Date();
     if ($("inDate") && !$("inDate").value) $("inDate").value = dateToISO(t);
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
@@ -924,22 +935,40 @@
     if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
-    if ($("basis") && !$("basis").value) $("basis").value = "0";
+    if ($("basis") && !$("basis").value) $("basis").value = String(BASIS_DEFAULT);
 
-    // Mobile pickers
+    ensureBasisDefault();
+
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
-
-    // Basis: FULL dollar increments
     const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 1.0, decimals: 0 });
 
-    attachMobilePicker("interestRatePct", { title:"Interest Rate (%)", values: irVals, defaultValue: 7.25 });
-    attachMobilePicker("cogNoInterest",   { title:"Projected COG", values: cogVals, defaultValue: 1.10 });
-    attachMobilePicker("deathLossPct",    { title:"Death Loss (%)", values: dlVals, defaultValue: 1.0 });
-    attachMobilePicker("basis",           { title:"Expected Basis ($/cwt)", values: bVals, defaultValue: 0 });
+    attachMobilePicker("interestRatePct", {
+      title:"Interest Rate (%)",
+      values: irVals,
+      defaultValue: 7.25
+    });
 
-    // Auto-calc on inputs
+    attachMobilePicker("cogNoInterest", {
+      title:"Projected COG",
+      values: cogVals,
+      defaultValue: 1.10
+    });
+
+    attachMobilePicker("deathLossPct", {
+      title:"Death Loss (%)",
+      values: dlVals,
+      defaultValue: 1.0
+    });
+
+    attachMobilePicker("basis", {
+      title:"Expected Basis ($/cwt)",
+      values: bVals,
+      defaultValue: BASIS_DEFAULT,
+      normalize: normalizeBasisValue
+    });
+
     const ids = [
       "inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
       "cogNoInterest","deathLossPct","interestRatePct","futures","basis"
@@ -951,7 +980,6 @@
       el.addEventListener("change", () => updateAll());
     });
 
-    // Buttons
     $("resetBtn")?.addEventListener("click", resetAll);
 
     $("quickRunBtn")?.addEventListener("click", () => {
