@@ -139,7 +139,6 @@
 
     .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
-    /* Inputs layout */
     .inputsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -151,7 +150,6 @@
     .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
     .field{ min-width:0; }
 
-    /* Tooltip lines */
     .withTip{ position:relative; }
     .tipLine{
       margin-top:6px;
@@ -179,7 +177,6 @@
     }
     .tipValue{ font-weight:900; color:#0f172a; }
 
-    /* Results tiles */
     .resultsGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
@@ -205,7 +202,6 @@
     .metric.bad{  background:var(--bad-bg);  border-color:var(--bad-bd);  color:var(--bad-tx); }
     .metric.good .k, .metric.mid .k, .metric.bad .k{ color:inherit; opacity:.85; }
 
-    /* Result block with inline tooltip text */
     .metricFoot{
       margin-top:6px;
       font-size:12px;
@@ -237,7 +233,6 @@
     .calc-table td:first-child{ color:var(--muted); width:60%; }
     .calc-table td:last-child{ text-align:right; font-weight:900; }
 
-    /* iOS-style picker modal (mobile only; wired in app.js) */
     .overlay{
       position:fixed; inset:0;
       background:rgba(0,0,0,.55);
@@ -296,9 +291,6 @@
 
     .pdfTemplate{ display:none; }
 
-    /* =========================================================
-       NEW: Interest Preset Buttons (safe add-on)
-    ========================================================= */
     .interestPresetGrid{
       display:grid;
       grid-template-columns:repeat(4, 1fr);
@@ -334,7 +326,6 @@
   <main>
     <div class="grid">
 
-      <!-- INPUTS -->
       <section class="card" aria-label="Inputs">
         <div class="cardHeader">
           <h2>Inputs</h2>
@@ -344,7 +335,6 @@
         </div>
 
         <div class="inputsGrid">
-          <!-- LEFT COLUMN -->
           <div class="col">
             <div class="field">
               <label>In Date</label>
@@ -392,13 +382,7 @@
             </div>
           </div>
 
-          <!-- RIGHT COLUMN -->
           <div class="col">
-            <!-- =========================================================
-                 UPDATED: Interest Rate field now includes presets + Custom
-                 - Presets set #interestRatePct and trigger existing app.js logic
-                 - Custom reveals your original scroll-wheel input (#interestRatePct)
-            ========================================================= -->
             <div class="field" id="wrapInterestRate">
               <label>Interest Rate (%)</label>
 
@@ -431,7 +415,7 @@
 
             <div class="field">
               <label>Expected Basis ($/cwt)</label>
-              <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" />
+              <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" value="0" />
             </div>
           </div>
         </div>
@@ -442,7 +426,6 @@
         </div>
       </section>
 
-      <!-- RESULTS -->
       <section class="card resultsCard" aria-label="Results">
         <div class="cardHeader">
           <h2>Results</h2>
@@ -537,7 +520,6 @@
     </div>
   </main>
 
-  <!-- Mobile Picker Modal -->
   <div id="pickerOverlay" class="overlay hidden" aria-hidden="true">
     <div class="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
       <div class="pickerTop">
@@ -556,10 +538,6 @@
 
   <script src="./app.js"></script>
 
-  <!-- =========================================================
-       NEW: Preset logic (loads config.json, renders buttons,
-       sets #interestRatePct, triggers existing app.js recalcs)
-  ========================================================= -->
   <script>
     (function(){
       const DEFAULT_CFG = { interestRatePresets:[6.25, 6.75, 7.25], defaultPresetIndex:1 };
@@ -596,7 +574,6 @@
 
         const middlePreset = presets[Math.floor(presets.length/2)] ?? 6.75;
 
-        // Build buttons
         grid.innerHTML = "";
         const btns = [];
 
@@ -617,7 +594,6 @@
           const key = `preset:${rate.toFixed(2)}`;
           makeBtn(label, key, () => {
             setActive(btns, key);
-            // Hide the input when on preset (you can change this to readonly if you prefer)
             customWrap.classList.add("hidden");
             input.value = rate.toFixed(2);
             fireInputEvents(input);
@@ -632,7 +608,6 @@
           fireInputEvents(input);
         });
 
-        // Default selection = preset index (or middle)
         let idx = Number.isInteger(CFG.defaultPresetIndex) ? CFG.defaultPresetIndex : Math.floor(presets.length/2);
         idx = Math.max(0, Math.min(idx, presets.length-1));
         const defRate = presets[idx];
@@ -644,9 +619,40 @@
         fireInputEvents(input);
       }
 
+      function forceBasisDefaultZero(){
+        const basis = document.getElementById("basis");
+        if(!basis) return;
+
+        const setZeroIfBlank = () => {
+          const raw = String(basis.value ?? "").trim();
+          if(raw === "" || raw === "-30") {
+            basis.value = "0";
+            fireInputEvents(basis);
+          }
+        };
+
+        setZeroIfBlank();
+
+        document.addEventListener("DOMContentLoaded", setZeroIfBlank);
+        window.addEventListener("load", setZeroIfBlank);
+
+        basis.addEventListener("focus", setZeroIfBlank, true);
+        basis.addEventListener("click", setZeroIfBlank, true);
+        basis.addEventListener("touchstart", setZeroIfBlank, { passive:true });
+
+        const resetBtn = document.getElementById("resetBtn");
+        if(resetBtn){
+          resetBtn.addEventListener("click", () => {
+            setTimeout(setZeroIfBlank, 0);
+            setTimeout(setZeroIfBlank, 50);
+          });
+        }
+      }
+
       document.addEventListener("DOMContentLoaded", async () => {
         await loadConfig();
         renderPresets();
+        forceBasisDefaultZero();
       });
     })();
   </script>
