@@ -625,7 +625,7 @@
 
         const setZeroIfBlank = () => {
           const raw = String(basis.value ?? "").trim();
-          if(raw === "" || raw === "-30") {
+          if(raw === "") {
             basis.value = "0";
             fireInputEvents(basis);
           }

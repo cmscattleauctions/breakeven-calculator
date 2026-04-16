@@ -55,7 +55,7 @@
   // ===================== Basis normalization =====================
   function normalizeBasisValue(raw) {
     const s = String(raw ?? "").trim();
-    if (s === "" || s === "-30" || s === "-30.0" || s === "-30.00") return String(BASIS_DEFAULT);
+    if (s === "") return String(BASIS_DEFAULT);
 
     const n = Number(s);
     if (!isFinite(n)) return String(BASIS_DEFAULT);
