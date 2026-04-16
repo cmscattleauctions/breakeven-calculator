@@ -4,7 +4,7 @@
 
   // ===================== State =====================
   let quickRun = false;
-  const BASIS_DEFAULT = 0;
+  const BASIS_DEFAULT = "";
 
   // ===================== Formatting =====================
   function money(x) {
@@ -55,10 +55,10 @@
   // ===================== Basis normalization =====================
   function normalizeBasisValue(raw) {
     const s = String(raw ?? "").trim();
-    if (s === "") return String(BASIS_DEFAULT);
+    if (s === "" || s === "-") return "";
 
     const n = Number(s);
-    if (!isFinite(n)) return String(BASIS_DEFAULT);
+    if (!isFinite(n)) return "";
 
     // Basis picker uses whole-dollar increments
     return String(Math.round(n));
@@ -67,7 +67,8 @@
   function ensureBasisDefault() {
     const basisEl = $("basis");
     if (!basisEl) return;
-    basisEl.value = normalizeBasisValue(basisEl.value);
+    const normalized = normalizeBasisValue(basisEl.value);
+    if (document.activeElement !== basisEl) basisEl.value = normalized;
   }
 
   // ===================== Status coloring =====================
@@ -913,7 +914,7 @@
     if ($("interestRatePct")) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
-    if ($("basis")) $("basis").value = String(BASIS_DEFAULT);
+    if ($("basis")) $("basis").value = "";
 
     if ($("adg")) $("adg").value = "—";
     if ($("outDateInline")) $("outDateInline").value = "—";
@@ -935,9 +936,7 @@
     if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
-    if ($("basis") && !$("basis").value) $("basis").value = String(BASIS_DEFAULT);
 
-    ensureBasisDefault();
 
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
@@ -965,7 +964,7 @@
     attachMobilePicker("basis", {
       title:"Expected Basis ($/cwt)",
       values: bVals,
-      defaultValue: BASIS_DEFAULT,
+      defaultValue: 0,
       normalize: normalizeBasisValue
     });
 
