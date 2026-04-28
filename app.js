@@ -55,10 +55,13 @@
   // ===================== Basis normalization =====================
   function normalizeBasisValue(raw) {
     const s = String(raw ?? "").trim();
-    if (s === "" || s === "-") return "";
+    // Allow "-" mid-type so user can enter negative numbers
+    if (s === "-") return "-";
+    // Empty or invalid => default to 0
+    if (s === "") return "0";
 
     const n = Number(s);
-    if (!isFinite(n)) return "";
+    if (!isFinite(n)) return "0";
 
     // Basis picker uses whole-dollar increments
     return String(Math.round(n));
@@ -914,7 +917,7 @@
     if ($("interestRatePct")) $("interestRatePct").value = "7.25";
     if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
-    if ($("basis")) $("basis").value = "";
+    if ($("basis")) $("basis").value = "0";
 
     if ($("adg")) $("adg").value = "—";
     if ($("outDateInline")) $("outDateInline").value = "—";
