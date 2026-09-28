@@ -151,16 +151,26 @@
 
     .error{ margin-top:8px; color:#b91c1c; font-size:13px; min-height:18px; }
 
-    .inputsGrid{
+    .field{ min-width:0; }
+
+    .inputSections{ display:flex; flex-direction:column; gap:22px; }
+    .inputSectionTitle{
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:10px;
+    }
+    .inputSectionGrid{
       display:grid;
       grid-template-columns:minmax(0,1fr);
       gap:10px;
     }
-    @media (min-width:860px){
-      .inputsGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    @media (min-width:520px){
+      .inputSectionGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     }
-    .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
-    .field{ min-width:0; }
+    .inputSectionGrid .fieldSpan2{ grid-column:1 / -1; }
 
     .withTip{ position:relative; }
     .tipLine{
@@ -189,15 +199,6 @@
     }
     .tipValue{ font-weight:900; color:#0f172a; }
 
-    .resultsGrid{
-      display:grid;
-      grid-template-columns:minmax(0,1fr);
-      gap:10px;
-    }
-    @media (min-width:560px){
-      .resultsGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
-    }
-
     .metric{
       padding:10px 12px;
       border:1px solid #e5eaf3;
@@ -213,6 +214,57 @@
     .metric.mid{  background:var(--mid-bg);  border-color:var(--mid-bd);  color:var(--mid-tx); }
     .metric.bad{  background:var(--bad-bg);  border-color:var(--bad-bd);  color:var(--bad-tx); }
     .metric.good .k, .metric.mid .k, .metric.bad .k{ color:inherit; opacity:.85; }
+
+    .heroGrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-bottom:14px;
+    }
+    .heroGrid.single .metric.hero{ grid-column:1 / -1; }
+    .metric.hero{ padding:16px; }
+    .metric.hero .k{ font-size:13px; }
+    .metric.hero .v{
+      font-size:26px;
+      font-weight:900;
+      margin-top:4px;
+      line-height:1.15;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+    @media (min-width:420px){
+      .metric.hero .v{ font-size:32px; }
+    }
+    @media (min-width:700px){
+      .metric.hero .v{ font-size:38px; }
+    }
+
+    .resultSection{
+      margin-top:16px;
+      padding-top:14px;
+      border-top:1px solid var(--border);
+    }
+    .resultSectionTitle{
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:10px;
+    }
+    .resultRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px 0;
+    }
+    .stat{ flex:1 1 110px; min-width:110px; padding:0 14px; }
+    .stat:first-child{ padding-left:0; }
+    .stat + .stat{ border-left:1px solid var(--border); }
+    .stat .k{ font-size:12px; color:var(--muted); }
+    .stat .v{ font-size:17px; font-weight:900; margin-top:2px; }
+    .stat.good .v{ color:var(--good-tx); }
+    .stat.mid .v{  color:var(--mid-tx); }
+    .stat.bad .v{  color:var(--bad-tx); }
 
     .metricFoot{
       margin-top:6px;
@@ -346,91 +398,107 @@
           </div>
         </div>
 
-        <div class="inputsGrid">
-          <div class="col">
-            <div class="field">
-              <label>In Date</label>
-              <input id="inDate" type="date" />
-            </div>
-
-            <div class="field" id="wrapTotalHead">
-              <label>Total Head</label>
-              <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
-            </div>
-
-            <div class="field withTip" id="wrapOwnershipPct">
-              <label>Ownership (%)</label>
-              <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
-              <div class="tipLine" id="wrapHeadOwnedTip" aria-live="polite">
-                <span class="tipBadge">i</span>
-                <span>Head Owned:</span>
-                <span class="tipValue" id="headOwnedTip">—</span>
+        <div class="inputSections">
+          <div class="inputSection">
+            <div class="inputSectionTitle">Cattle &amp; Ownership</div>
+            <div class="inputSectionGrid">
+              <div class="field">
+                <label>In Date</label>
+                <input id="inDate" type="date" />
               </div>
-            </div>
 
-            <div class="field">
-              <label>In Weight (lb)</label>
-              <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
-            </div>
+              <div class="field" id="wrapTotalHead">
+                <label>Total Head</label>
+                <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
+              </div>
 
-            <div class="field">
-              <label>Purchase Price ($/cwt)</label>
-              <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
-            </div>
+              <div class="field withTip" id="wrapOwnershipPct">
+                <label>Ownership (%)</label>
+                <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
+                <div class="tipLine" id="wrapHeadOwnedTip" aria-live="polite">
+                  <span class="tipBadge">i</span>
+                  <span>Head Owned:</span>
+                  <span class="tipValue" id="headOwnedTip">—</span>
+                </div>
+              </div>
 
-            <div class="field">
-              <label>Out Weight (lb)</label>
-              <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
-            </div>
+              <div class="field">
+                <label>In Weight (lb)</label>
+                <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
+              </div>
 
-            <div class="field">
-              <label>Projected COG (no interest) ($/lb of gain)</label>
-              <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" />
-            </div>
-
-            <div class="field">
-              <label>Death Loss (%)</label>
-              <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" />
+              <div class="field">
+                <label>Purchase Price ($/cwt)</label>
+                <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
+              </div>
             </div>
           </div>
 
-          <div class="col">
-            <div class="field" id="wrapInterestRate">
-              <label>Interest Rate (%)</label>
+          <div class="inputSection">
+            <div class="inputSectionTitle">Projections</div>
+            <div class="inputSectionGrid">
+              <div class="field">
+                <label>Out Weight (lb)</label>
+                <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
+              </div>
 
-              <div class="interestPresetGrid" id="interestPresetGrid"></div>
+              <div class="field">
+                <div class="fieldHeader">
+                  <label id="daysOnFeedLabel">Days on Feed</label>
+                  <button id="dofAdgModeBtn" class="pillToggle" type="button" data-on="true">Input: ADG</button>
+                </div>
+                <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly value="—" />
+              </div>
 
-              <div class="interestCustomWrap" id="interestCustomWrap">
-                <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
+              <div class="field">
+                <label id="adgLabel">ADG (lb/day)</label>
+                <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
+              </div>
+
+              <div class="field">
+                <label>Out Date</label>
+                <input id="outDateInline" type="text" readonly value="—" />
+              </div>
+
+              <div class="field">
+                <label>Projected COG (no interest) ($/lb of gain)</label>
+                <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" />
+              </div>
+
+              <div class="field">
+                <label>Death Loss (%)</label>
+                <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" />
               </div>
             </div>
+          </div>
 
-            <div class="field">
-              <div class="fieldHeader">
-                <label id="daysOnFeedLabel">Days on Feed</label>
-                <button id="dofAdgModeBtn" class="pillToggle" type="button" data-on="true">Input: ADG</button>
+          <div class="inputSection">
+            <div class="inputSectionTitle">Financing</div>
+            <div class="inputSectionGrid">
+              <div class="field fieldSpan2" id="wrapInterestRate">
+                <label>Interest Rate (%)</label>
+
+                <div class="interestPresetGrid" id="interestPresetGrid"></div>
+
+                <div class="interestCustomWrap" id="interestCustomWrap">
+                  <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
+                </div>
               </div>
-              <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly value="—" />
             </div>
+          </div>
 
-            <div class="field">
-              <label id="adgLabel">ADG (lb/day)</label>
-              <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
-            </div>
+          <div class="inputSection">
+            <div class="inputSectionTitle">Market Assumptions</div>
+            <div class="inputSectionGrid">
+              <div class="field">
+                <label>Futures ($/cwt)</label>
+                <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
+              </div>
 
-            <div class="field">
-              <label>Out Date</label>
-              <input id="outDateInline" type="text" readonly value="—" />
-            </div>
-
-            <div class="field">
-              <label>Futures ($/cwt)</label>
-              <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
-            </div>
-
-            <div class="field">
-              <label>Expected Basis ($/cwt)</label>
-              <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" value="0" />
+              <div class="field">
+                <label>Expected Basis ($/cwt)</label>
+                <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" value="0" />
+              </div>
             </div>
           </div>
         </div>
@@ -450,66 +518,86 @@
           </div>
         </div>
 
-        <div class="resultsGrid" id="resultsGrid">
-          <div class="metric" id="tilePlPerHd">
+        <div class="heroGrid" id="heroGrid">
+          <div class="metric hero" id="tilePlPerHd">
             <div class="k">P/L per head</div>
             <div class="v" id="plPerHd">—</div>
           </div>
 
-          <div class="metric" id="tilePlPerCwt">
-            <div class="k">P/L per cwt</div>
-            <div class="v" id="plPerCwt">—</div>
-          </div>
-
-          <div class="metric small" id="tileBreakEven">
-            <div class="k">Break-even</div>
-            <div class="v" id="breakEvenCwt">—</div>
-          </div>
-
-          <div class="metric small" id="tileSalesPrice">
-            <div class="k">Sales Price (Futures + Basis)</div>
-            <div class="v" id="salesPrice">—</div>
-          </div>
-
-          <div class="metric" id="tileContractsNeeded">
-            <div class="k" id="contractsLabel">Contracts Needed</div>
-            <div class="v" id="contractsNeeded">—</div>
-            <div class="metricFoot">
-              <span class="tipBadge">i</span>
-              <span id="contractsTooltip">
-                Based on Head Owned, not the full lot. Uses Feeder under 1,000 lb and Live at/over 1,000 lb.
-              </span>
-            </div>
-          </div>
-
-          <div class="metric" id="tileTotalPL">
+          <div class="metric hero" id="tileTotalPL">
             <div class="k">Projected Total P/L</div>
             <div class="v" id="projectedTotalPL">—</div>
           </div>
+        </div>
 
-          <div class="metric" id="tileCapitalInvested">
-            <div class="k">Capital Invested</div>
-            <div class="v" id="capitalInvested">—</div>
+        <div class="resultSection">
+          <div class="resultSectionTitle">Pricing</div>
+          <div class="resultRow">
+            <div class="stat" id="tileBreakEven">
+              <div class="k">Break-even</div>
+              <div class="v" id="breakEvenCwt">—</div>
+            </div>
+
+            <div class="stat" id="tileSalesPrice">
+              <div class="k">Sales Price (Futures + Basis)</div>
+              <div class="v" id="salesPrice">—</div>
+            </div>
+
+            <div class="stat" id="tilePlPerCwt">
+              <div class="k">P/L per cwt</div>
+              <div class="v" id="plPerCwt">—</div>
+            </div>
           </div>
+        </div>
 
-          <div class="metric" id="tileCattleSales">
-            <div class="k">Cattle Sales</div>
-            <div class="v" id="cattleSales">—</div>
+        <div class="resultSection" id="sectionCapital">
+          <div class="resultSectionTitle">Capital</div>
+          <div class="resultRow">
+            <div class="stat" id="tileCapitalInvested">
+              <div class="k">Capital Invested</div>
+              <div class="v" id="capitalInvested">—</div>
+            </div>
+
+            <div class="stat" id="tileCattleSales">
+              <div class="k">Cattle Sales</div>
+              <div class="v" id="cattleSales">—</div>
+            </div>
           </div>
+        </div>
 
-          <div class="metric" id="tileRoe">
-            <div class="k">Return on Equity (ROE)</div>
-            <div class="v" id="roe">—</div>
+        <div class="resultSection" id="sectionHedging">
+          <div class="resultSectionTitle">Hedging</div>
+          <div class="resultRow">
+            <div class="stat" id="tileContractsNeeded">
+              <div class="k" id="contractsLabel">Contracts Needed</div>
+              <div class="v" id="contractsNeeded">—</div>
+              <div class="metricFoot">
+                <span class="tipBadge">i</span>
+                <span id="contractsTooltip">
+                  Based on Head Owned, not the full lot. Uses Feeder under 1,000 lb and Live at/over 1,000 lb.
+                </span>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div class="metric" id="tileAnnualRoe">
-            <div class="k">Annualized ROE</div>
-            <div class="v" id="annualRoe">—</div>
-          </div>
+        <div class="resultSection" id="sectionReturns">
+          <div class="resultSectionTitle">Returns</div>
+          <div class="resultRow">
+            <div class="stat" id="tileRoe">
+              <div class="k">Return on Equity (ROE)</div>
+              <div class="v" id="roe">—</div>
+            </div>
 
-          <div class="metric" id="tileIrr">
-            <div class="k">IRR</div>
-            <div class="v" id="irr">—</div>
+            <div class="stat" id="tileAnnualRoe">
+              <div class="k">Annualized ROE</div>
+              <div class="v" id="annualRoe">—</div>
+            </div>
+
+            <div class="stat" id="tileIrr">
+              <div class="k">IRR</div>
+              <div class="v" id="irr">—</div>
+            </div>
           </div>
         </div>
 
@@ -622,6 +710,26 @@
           if(!Number.isFinite(cur)) input.value = middlePreset.toFixed(2);
           fireInputEvents(input);
         });
+
+        // A shared scenario link already set interestRatePct (app.js applies it
+        // before this script runs) — respect it instead of clobbering it with
+        // the configured default.
+        const sharedRate = new URLSearchParams(window.location.search).has("ir")
+          ? parseFloat(input.value)
+          : NaN;
+
+        if (Number.isFinite(sharedRate)) {
+          const matchedPreset = presets.find(rate => Math.abs(rate - sharedRate) < 0.005);
+          if (matchedPreset !== undefined) {
+            setActive(btns, `preset:${matchedPreset.toFixed(2)}`);
+            customWrap.classList.add("hidden");
+          } else {
+            setActive(btns, "custom");
+            customWrap.classList.remove("hidden");
+          }
+          fireInputEvents(input);
+          return;
+        }
 
         let idx = Number.isInteger(CFG.defaultPresetIndex) ? CFG.defaultPresetIndex : Math.floor(presets.length/2);
         idx = Math.max(0, Math.min(idx, presets.length-1));

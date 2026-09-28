@@ -243,9 +243,13 @@
     hide("tileRoe", quickRun);
     hide("tileAnnualRoe", quickRun);
     hide("tileIrr", quickRun);
+    hide("sectionCapital", quickRun);
+    hide("sectionHedging", quickRun);
+    hide("sectionReturns", quickRun);
     $("detailsPanel")?.classList.toggle("hidden", quickRun);
 
     $("tileContractsNeeded")?.classList.toggle("hidden", quickRun);
+    $("heroGrid")?.classList.toggle("single", quickRun);
   }
 
   // ===================== Outputs reset =====================
@@ -633,22 +637,25 @@
 
   async function shareScenario() {
     const url = buildScenarioUrl();
-    const title = "CMS Breakeven Scenario";
-    const text = "Here’s a CMS breakeven scenario link.";
-
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, text, url });
-        return;
-      }
-    } catch (_) {}
 
     try {
       await navigator.clipboard.writeText(url);
       alert("Scenario link copied to clipboard.");
-    } catch (_) {
-      prompt("Copy this scenario link:", url);
-    }
+      return;
+    } catch (_) {}
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "CMS Breakeven Scenario",
+          text: "Here’s a CMS breakeven scenario link.",
+          url
+        });
+        return;
+      }
+    } catch (_) {}
+
+    prompt("Copy this scenario link:", url);
   }
 
   function applyScenarioFromUrl() {
