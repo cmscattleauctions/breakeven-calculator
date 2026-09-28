@@ -4,6 +4,7 @@
 
   // ===================== State =====================
   let quickRun = false;
+  let adgInputMode = true; // true = input ADG (dof calculated); false = input Days on Feed (adg calculated)
   const BASIS_DEFAULT = "";
 
   // ===================== Formatting =====================
@@ -84,17 +85,46 @@
   }
 
   // ===================== Derived fields =====================
-  function updateADG(){
-    const daysOnFeed = numOrNaN("daysOnFeed");
+  function applyDofAdgModeUI(){
+    const btn = $("dofAdgModeBtn");
+    if (btn) {
+      btn.textContent = `Input: ${adgInputMode ? "ADG" : "Days on Feed"}`;
+      btn.setAttribute("data-on", adgInputMode ? "true" : "false");
+    }
+
+    const dofEl = $("daysOnFeed");
+    const adgEl = $("adg");
+    if (dofEl) dofEl.readOnly = adgInputMode;
+    if (adgEl) adgEl.readOnly = !adgInputMode;
+
+    const dofLabel = $("daysOnFeedLabel");
+    if (dofLabel) dofLabel.textContent = "Days on Feed" + (adgInputMode ? " (calculated)" : "");
+
+    const adgLabel = $("adgLabel");
+    if (adgLabel) adgLabel.textContent = "ADG (lb/day)" + (adgInputMode ? "" : " (calculated)");
+  }
+
+  function updateFeedPeriod(){
     const inWeight = numOrNaN("inWeight");
     const outWeight = numOrNaN("outWeight");
+    const dofEl = $("daysOnFeed");
     const adgEl = $("adg");
-    if (!adgEl) return;
+    if (!dofEl || !adgEl) return;
 
-    if (isFinite(daysOnFeed) && daysOnFeed > 0 && isFinite(inWeight) && isFinite(outWeight) && outWeight > inWeight) {
-      adgEl.value = fmtNum((outWeight - inWeight) / daysOnFeed, 2);
+    const gained = (isFinite(inWeight) && isFinite(outWeight) && outWeight > inWeight)
+      ? (outWeight - inWeight)
+      : NaN;
+
+    if (adgInputMode) {
+      const adg = numOrNaN("adg");
+      dofEl.value = (isFinite(gained) && isFinite(adg) && adg > 0)
+        ? String(Math.round(gained / adg))
+        : "—";
     } else {
-      adgEl.value = "—";
+      const daysOnFeed = numOrNaN("daysOnFeed");
+      adgEl.value = (isFinite(gained) && isFinite(daysOnFeed) && daysOnFeed > 0)
+        ? fmtNum(gained / daysOnFeed, 2)
+        : "—";
     }
   }
 
@@ -245,7 +275,7 @@
 
     ensureBasisDefault();
 
-    updateADG();
+    updateFeedPeriod();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
@@ -581,9 +611,10 @@
   function buildScenarioUrl() {
     const p = new URLSearchParams();
     p.set("qr", quickRun ? "1" : "0");
+    p.set("am", adgInputMode ? "1" : "0");
 
     const fields = [
-      ["inDate","id"], ["daysOnFeed","dof"],
+      ["inDate","id"], ["daysOnFeed","dof"], ["adg","adg"],
       ["totalHead","th"], ["ownershipPct","own"],
       ["inWeight","iw"], ["priceCwt","pp"], ["outWeight","ow"],
       ["cogNoInterest","cog"], ["deathLossPct","dl"],
@@ -625,9 +656,10 @@
     if (!p || [...p.keys()].length === 0) return;
 
     quickRun = p.get("qr") === "1";
+    adgInputMode = p.has("am") ? (p.get("am") === "1") : true;
 
     const map = [
-      ["inDate","id"], ["daysOnFeed","dof"],
+      ["inDate","id"], ["daysOnFeed","dof"], ["adg","adg"],
       ["totalHead","th"], ["ownershipPct","own"],
       ["inWeight","iw"], ["priceCwt","pp"], ["outWeight","ow"],
       ["cogNoInterest","cog"], ["deathLossPct","dl"],
@@ -919,7 +951,8 @@
     if ($("deathLossPct")) $("deathLossPct").value = "1.0";
     if ($("basis")) $("basis").value = "0";
 
-    if ($("adg")) $("adg").value = "—";
+    if ($("daysOnFeed")) $("daysOnFeed").value = "";
+    if ($("adg")) $("adg").value = "";
     if ($("outDateInline")) $("outDateInline").value = "—";
 
     clearError();
@@ -972,7 +1005,7 @@
     });
 
     const ids = [
-      "inDate","daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
+      "inDate","daysOnFeed","adg","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
       "cogNoInterest","deathLossPct","interestRatePct","futures","basis"
     ];
     ids.forEach(id => {
@@ -990,10 +1023,17 @@
       updateAll();
     });
 
+    $("dofAdgModeBtn")?.addEventListener("click", () => {
+      adgInputMode = !adgInputMode;
+      applyDofAdgModeUI();
+      updateAll();
+    });
+
     $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
     $("shareScenarioBtn")?.addEventListener("click", shareScenario);
 
     applyQuickRunUI();
+    applyDofAdgModeUI();
     updateAll();
   });
 

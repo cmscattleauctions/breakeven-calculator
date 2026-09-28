@@ -101,6 +101,16 @@
       color:#0f172a;
     }
 
+    .fieldHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:5px;
+    }
+    .fieldHeader label{ margin-bottom:0; }
+    .fieldHeader .pillToggle{ padding:5px 9px; font-size:11px; }
+
     button{
       border:0;
       border-radius:12px;
@@ -396,13 +406,16 @@
             </div>
 
             <div class="field">
-              <label>Days on Feed</label>
-              <input id="daysOnFeed" type="number" inputmode="numeric" placeholder="e.g., 180" />
+              <div class="fieldHeader">
+                <label id="daysOnFeedLabel">Days on Feed</label>
+                <button id="dofAdgModeBtn" class="pillToggle" type="button" data-on="true">Input: ADG</button>
+              </div>
+              <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly value="—" />
             </div>
 
             <div class="field">
-              <label>ADG (lb/day)</label>
-              <input id="adg" type="text" readonly value="—" />
+              <label id="adgLabel">ADG (lb/day)</label>
+              <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
             </div>
 
             <div class="field">
