@@ -172,6 +172,12 @@
     if (dofEl) { dofEl.readOnly = adgInputMode; dofEl.tabIndex = adgInputMode ? -1 : 0; }
     if (adgEl) { adgEl.readOnly = !adgInputMode; adgEl.tabIndex = adgInputMode ? 0 : -1; }
 
+    // A field that just became editable may still hold the "—" placeholder
+    // value it showed while it was the calculated (uncomputable) field —
+    // clear it so typing doesn't require backspacing it first.
+    const editableEl = adgInputMode ? adgEl : dofEl;
+    if (editableEl && editableEl.value === "—") editableEl.value = "";
+
     const dofLabel = $("daysOnFeedLabel");
     if (dofLabel) dofLabel.textContent = "Days on Feed" + (adgInputMode ? " (calculated)" : "");
 
@@ -1182,6 +1188,7 @@
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
     const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 1.0, decimals: 0 });
+    const eqVals  = rangeValues({ start: 0.0,  end: 100.0, step: 1.0,  decimals: 0 });
 
     attachMobilePicker("interestRatePct", {
       title:"Interest Rate (%)",
@@ -1199,6 +1206,12 @@
       title:"Death Loss (%)",
       values: dlVals,
       defaultValue: 1.0
+    });
+
+    attachMobilePicker("equityPct", {
+      title:"Equity Contribution (%)",
+      values: eqVals,
+      defaultValue: 0
     });
 
     attachMobilePicker("basis", {

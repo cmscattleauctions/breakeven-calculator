@@ -83,21 +83,28 @@
       background:var(--border);
       box-shadow:0 -2px 10px rgba(15,23,42,.12);
       padding-bottom:env(safe-area-inset-bottom, 0);
+      /* Force its own compositing layer — works around iOS Safari
+         sometimes dropping/flickering fixed-position bars during scroll. */
+      -webkit-transform:translateZ(0);
+      transform:translateZ(0);
+      will-change:transform;
     }
     .mobileStickyItem{
       flex:1 1 0;
       background:var(--results-bg);
-      padding:8px 12px;
+      padding:12px 16px 14px;
       display:flex;
       flex-direction:column;
       align-items:flex-start;
+      gap:2px;
       min-width:0;
     }
-    .mobileStickyItem .k{ font-size:10px; color:var(--muted); font-weight:700; }
+    .mobileStickyItem .k{ font-size:12px; color:var(--muted); font-weight:700; }
     .mobileStickyItem .v{
-      font-size:15px;
+      font-size:23px;
       font-weight:900;
       color:#0f172a;
+      line-height:1.15;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
@@ -110,7 +117,7 @@
       .mobileStickyBar{ display:none; }
     }
     @media (max-width:979.98px){
-      body{ padding-bottom:60px; }
+      body{ padding-bottom:88px; }
     }
 
     .cardHeader{
@@ -389,11 +396,9 @@
     .resultRow{
       display:flex;
       flex-wrap:wrap;
-      gap:12px 0;
+      gap:14px 20px;
     }
-    .stat{ flex:1 1 110px; min-width:110px; padding:0 14px; }
-    .stat:first-child{ padding-left:0; }
-    .stat + .stat{ border-left:1px solid var(--border); }
+    .stat{ flex:1 1 132px; min-width:132px; }
     .stat .k{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; }
     .stat .v{ font-size:17px; font-weight:900; margin-top:2px; }
     .stat.good .v{ color:var(--good-tx); }
@@ -706,7 +711,7 @@
 
             <div class="stat" id="tilePlPerHdPerDay">
               <div class="k">
-                <span>P/L per head/day</span>
+                <span>P/L /hd/day</span>
                 <button type="button" class="iconBtn" id="plPerHdPerDayInfoBtn" aria-expanded="false" aria-controls="plPerHdPerDayInfoText" aria-label="What is P/L per head/day?">i</button>
               </div>
               <div class="v" id="plPerHdPerDay">—</div>
@@ -754,7 +759,7 @@
           <div class="ownershipNote hidden" id="ownershipNoteReturns"></div>
           <div class="resultRow">
             <div class="stat" id="tileRoe">
-              <div class="k">Return on Equity (ROE)</div>
+              <div class="k">ROE</div>
               <div class="v" id="roe">—</div>
             </div>
 
