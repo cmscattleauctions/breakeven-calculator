@@ -67,6 +67,51 @@
       min-width:0;
     }
     .resultsCard{ background:var(--results-bg); }
+    @media (min-width:980px){
+      .resultsCard.stickyFits{
+        position:sticky;
+        top:14px;
+      }
+    }
+
+    .mobileStickyBar{
+      position:fixed;
+      left:0; right:0; bottom:0;
+      z-index:500;
+      display:flex;
+      gap:1px;
+      background:var(--border);
+      box-shadow:0 -2px 10px rgba(15,23,42,.12);
+      padding-bottom:env(safe-area-inset-bottom, 0);
+    }
+    .mobileStickyItem{
+      flex:1 1 0;
+      background:var(--results-bg);
+      padding:8px 12px;
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      min-width:0;
+    }
+    .mobileStickyItem .k{ font-size:10px; color:var(--muted); font-weight:700; }
+    .mobileStickyItem .v{
+      font-size:15px;
+      font-weight:900;
+      color:#0f172a;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:100%;
+    }
+    .mobileStickyItem.good .v{ color:var(--good-tx); }
+    .mobileStickyItem.mid .v{  color:var(--mid-tx); }
+    .mobileStickyItem.bad .v{  color:var(--bad-tx); }
+    @media (min-width:980px){
+      .mobileStickyBar{ display:none; }
+    }
+    @media (max-width:979.98px){
+      body{ padding-bottom:60px; }
+    }
 
     .cardHeader{
       display:flex;
@@ -121,10 +166,35 @@
       background:#e8eef7;
       color:#0f172a;
       white-space:nowrap;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
     }
     button.primary{
       background:var(--cms);
       color:#fff;
+    }
+    .btnIcon{ flex:0 0 auto; }
+
+    .iconBtn{
+      all:unset;
+      box-sizing:border-box;
+      width:18px; height:18px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:11px;
+      background:#eef2f7;
+      color:#0f172a;
+      border:1px solid rgba(15,23,42,.15);
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .iconBtn:focus-visible{
+      outline:2px solid rgba(51,102,153,.45);
+      outline-offset:1px;
     }
 
     .hidden{ display:none !important; }
@@ -172,17 +242,6 @@
     }
     .inputSectionGrid .fieldSpan2{ grid-column:1 / -1; }
 
-    .withTip{ position:relative; }
-    .tipLine{
-      margin-top:6px;
-      font-size:12px;
-      color:var(--muted);
-      display:flex;
-      align-items:flex-start;
-      gap:6px;
-      user-select:none;
-      line-height:1.25;
-    }
     .tipBadge{
       width:18px; height:18px;
       border-radius:999px;
@@ -197,7 +256,83 @@
       flex:0 0 auto;
       margin-top:1px;
     }
-    .tipValue{ font-weight:900; color:#0f172a; }
+    .fieldHelper{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.25;
+    }
+    .fieldHelper strong{ color:#0f172a; font-weight:900; }
+
+    .segmentedControl{
+      display:flex;
+      gap:8px;
+      margin-top:8px;
+    }
+    .segmentedControl .segBtn{
+      flex:1 1 0;
+      border:1px solid rgba(15,23,42,.12);
+      background:#fff;
+      border-radius:12px;
+      padding:10px 8px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:12px;
+      line-height:1;
+      color:#0f172a;
+      text-align:center;
+    }
+    .segmentedControl .segBtn[aria-pressed="true"]{
+      background:rgba(51,102,153,.12);
+      border-color:rgba(51,102,153,.35);
+    }
+    .fieldGroupLabel{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:5px;
+      display:block;
+    }
+
+    .equityExpanderToggle{
+      all:unset;
+      box-sizing:border-box;
+      display:flex;
+      width:100%;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:10px;
+      padding:9px 10px;
+      background:var(--soft);
+      border:1px solid var(--border);
+      border-radius:10px;
+      font-weight:700;
+      font-size:12px;
+      color:#0f172a;
+      cursor:pointer;
+    }
+    .equityExpanderToggle .chevronIcon{ transition:transform .15s ease; flex:0 0 auto; }
+    .equityExpanderToggle[aria-expanded="true"] .chevronIcon{ transform:rotate(180deg); }
+    .equityExpanderPanel{ margin-top:10px; }
+
+    .infoPopover{
+      margin-top:4px;
+      font-size:11px;
+      color:var(--muted);
+      line-height:1.3;
+    }
+    .statLabelRow{
+      display:flex;
+      align-items:center;
+      gap:4px;
+    }
+
+    .ownershipNote{
+      font-size:11px;
+      font-weight:700;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
 
     .metric{
       padding:10px 12px;
@@ -219,29 +354,28 @@
       display:grid;
       grid-template-columns:1fr 1fr;
       gap:10px;
-      margin-bottom:14px;
+      margin-bottom:10px;
     }
     .heroGrid.single .metric.hero{ grid-column:1 / -1; }
-    .metric.hero{ padding:16px; }
-    .metric.hero .k{ font-size:13px; }
+    .metric.hero{ padding:12px 14px; }
+    .metric.hero .k{ font-size:12px; }
     .metric.hero .v{
-      font-size:26px;
+      font-size:20px;
       font-weight:900;
-      margin-top:4px;
+      margin-top:3px;
       line-height:1.15;
-      overflow-wrap:anywhere;
-      word-break:break-word;
+      white-space:normal;
     }
     @media (min-width:420px){
-      .metric.hero .v{ font-size:32px; }
+      .metric.hero .v{ font-size:24px; }
     }
     @media (min-width:700px){
-      .metric.hero .v{ font-size:38px; }
+      .metric.hero .v{ font-size:27px; }
     }
 
     .resultSection{
-      margin-top:16px;
-      padding-top:14px;
+      margin-top:12px;
+      padding-top:10px;
       border-top:1px solid var(--border);
     }
     .resultSectionTitle{
@@ -260,7 +394,7 @@
     .stat{ flex:1 1 110px; min-width:110px; padding:0 14px; }
     .stat:first-child{ padding-left:0; }
     .stat + .stat{ border-left:1px solid var(--border); }
-    .stat .k{ font-size:12px; color:var(--muted); }
+    .stat .k{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; }
     .stat .v{ font-size:17px; font-weight:900; margin-top:2px; }
     .stat.good .v{ color:var(--good-tx); }
     .stat.mid .v{  color:var(--mid-tx); }
@@ -402,7 +536,7 @@
           <div class="inputSection">
             <div class="inputSectionTitle">Cattle &amp; Ownership</div>
             <div class="inputSectionGrid">
-              <div class="field">
+              <div class="field fieldSpan2">
                 <label>In Date</label>
                 <input id="inDate" type="date" />
               </div>
@@ -412,13 +546,11 @@
                 <input id="totalHead" type="number" inputmode="numeric" placeholder="e.g., 1000" />
               </div>
 
-              <div class="field withTip" id="wrapOwnershipPct">
+              <div class="field" id="wrapOwnershipPct">
                 <label>Ownership (%)</label>
                 <input id="ownershipPct" type="number" step="0.01" inputmode="decimal" placeholder="100" />
-                <div class="tipLine" id="wrapHeadOwnedTip" aria-live="polite">
-                  <span class="tipBadge">i</span>
-                  <span>Head Owned:</span>
-                  <span class="tipValue" id="headOwnedTip">—</span>
+                <div class="fieldHelper" id="wrapHeadOwnedTip" aria-live="polite">
+                  <strong id="headOwnedTip">—</strong> head owned
                 </div>
               </div>
 
@@ -436,18 +568,17 @@
 
           <div class="inputSection">
             <div class="inputSectionTitle">Projections</div>
-            <div class="inputSectionGrid">
+
+            <span class="fieldGroupLabel" id="dofAdgGroupLabel">Enter</span>
+            <div class="segmentedControl" role="group" aria-labelledby="dofAdgGroupLabel">
+              <button type="button" class="segBtn" id="modeAdgBtn" aria-pressed="true">ADG</button>
+              <button type="button" class="segBtn" id="modeDofBtn" aria-pressed="false">Days on Feed</button>
+            </div>
+
+            <div class="inputSectionGrid" style="margin-top:10px;">
               <div class="field">
                 <label>Out Weight (lb)</label>
                 <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
-              </div>
-
-              <div class="field">
-                <div class="fieldHeader">
-                  <label id="daysOnFeedLabel">Days on Feed</label>
-                  <button id="dofAdgModeBtn" class="pillToggle" type="button" data-on="true">Input: ADG</button>
-                </div>
-                <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly value="—" />
               </div>
 
               <div class="field">
@@ -456,18 +587,23 @@
               </div>
 
               <div class="field">
+                <label id="daysOnFeedLabel">Days on Feed (calculated)</label>
+                <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly tabindex="-1" value="—" />
+              </div>
+
+              <div class="field">
                 <label>Out Date</label>
-                <input id="outDateInline" type="text" readonly value="—" />
+                <input id="outDateInline" type="text" readonly tabindex="-1" value="—" />
               </div>
 
               <div class="field">
                 <label>Projected COG (no interest) ($/lb of gain)</label>
-                <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" />
+                <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" placeholder="e.g., 1.10" />
               </div>
 
               <div class="field">
                 <label>Death Loss (%)</label>
-                <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" />
+                <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g., 1.0" />
               </div>
             </div>
           </div>
@@ -482,6 +618,24 @@
 
                 <div class="interestCustomWrap" id="interestCustomWrap">
                   <input id="interestRatePct" type="number" step="0.05" min="0" max="25" inputmode="decimal" />
+                </div>
+
+                <button type="button" class="equityExpanderToggle" id="equityExpanderToggle" aria-expanded="false" aria-controls="equityExpanderPanel">
+                  <span id="equitySummaryText">0% equity · 100% financed</span>
+                  <svg class="chevronIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+
+                <div class="equityExpanderPanel hidden" id="equityExpanderPanel">
+                  <div class="inputSectionGrid">
+                    <div class="field">
+                      <label for="equityPct">Equity Contribution (%)</label>
+                      <input id="equityPct" type="number" step="1" min="0" max="100" inputmode="decimal" placeholder="0" value="0" />
+                    </div>
+                    <div class="field">
+                      <label>Financed (%)</label>
+                      <input id="financedPct" type="text" readonly tabindex="-1" value="100" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -513,8 +667,14 @@
         <div class="cardHeader">
           <h2>Results</h2>
           <div class="headerActions">
-            <button id="downloadPdfBtn" class="primary" type="button">Download PDF</button>
-            <button id="shareScenarioBtn" type="button">Share Scenario</button>
+            <button id="downloadPdfBtn" class="primary" type="button">
+              <svg class="btnIcon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download PDF
+            </button>
+            <button id="shareScenarioBtn" type="button">
+              <svg class="btnIcon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-3.8M8.6 13.4l6.8 3.8"/></svg>
+              Share Scenario
+            </button>
           </div>
         </div>
 
@@ -526,6 +686,7 @@
 
           <div class="metric hero" id="tileTotalPL">
             <div class="k">Projected Total P/L</div>
+            <div class="ownershipNote hidden" id="ownershipNoteHero"></div>
             <div class="v" id="projectedTotalPL">—</div>
           </div>
         </div>
@@ -539,19 +700,25 @@
             </div>
 
             <div class="stat" id="tileSalesPrice">
-              <div class="k">Sales Price (Futures + Basis)</div>
+              <div class="k">Sales Price</div>
               <div class="v" id="salesPrice">—</div>
             </div>
 
-            <div class="stat" id="tilePlPerCwt">
-              <div class="k">P/L per cwt</div>
-              <div class="v" id="plPerCwt">—</div>
+            <div class="stat" id="tilePlPerHdPerDay">
+              <div class="k">
+                <span>P/L per head/day</span>
+                <button type="button" class="iconBtn" id="plPerHdPerDayInfoBtn" aria-expanded="false" aria-controls="plPerHdPerDayInfoText" aria-label="What is P/L per head/day?">i</button>
+              </div>
+              <div class="v" id="plPerHdPerDay">—</div>
+              <div class="infoPopover hidden" id="plPerHdPerDayInfoText" role="tooltip">P/L per head divided by days on feed.</div>
             </div>
           </div>
+          <span id="plPerCwt" class="hidden">—</span>
         </div>
 
         <div class="resultSection" id="sectionCapital">
           <div class="resultSectionTitle">Capital</div>
+          <div class="ownershipNote hidden" id="ownershipNoteCapital"></div>
           <div class="resultRow">
             <div class="stat" id="tileCapitalInvested">
               <div class="k">Capital Invested</div>
@@ -567,6 +734,7 @@
 
         <div class="resultSection" id="sectionHedging">
           <div class="resultSectionTitle">Hedging</div>
+          <div class="ownershipNote hidden" id="ownershipNoteHedging"></div>
           <div class="resultRow">
             <div class="stat" id="tileContractsNeeded">
               <div class="k" id="contractsLabel">Contracts Needed</div>
@@ -583,6 +751,7 @@
 
         <div class="resultSection" id="sectionReturns">
           <div class="resultSectionTitle">Returns</div>
+          <div class="ownershipNote hidden" id="ownershipNoteReturns"></div>
           <div class="resultRow">
             <div class="stat" id="tileRoe">
               <div class="k">Return on Equity (ROE)</div>
@@ -599,6 +768,7 @@
               <div class="v" id="irr">—</div>
             </div>
           </div>
+          <div class="infoPopover hidden" id="returnsZeroEquityNote">ROE and Annualized ROE are undefined with $0 of equity invested — return on zero cash isn't defined. Add equity above to see ROE.</div>
         </div>
 
         <details id="detailsPanel">
@@ -613,7 +783,14 @@
               <tr><td>Interest / hd</td><td id="d_interestPerHd">—</td></tr>
               <tr><td>Total cost / hd</td><td id="d_totalCostPerHd">—</td></tr>
               <tr><td>Cattle sales / hd</td><td id="d_salesPerHd">—</td></tr>
-              <tr><td>Equity base (Capital × 30%)</td><td id="d_equityBase">—</td></tr>
+              <tr><td>Relevant cost base (Capital Invested)</td><td id="d_financingBase">—</td></tr>
+              <tr><td>Equity contribution (%)</td><td id="d_equityPctDisplay">—</td></tr>
+              <tr><td>Equity invested ($)</td><td id="d_equityInvested">—</td></tr>
+              <tr><td>Financed (%)</td><td id="d_financedPctDisplay">—</td></tr>
+              <tr><td>Borrowed amount ($)</td><td id="d_borrowedAmount">—</td></tr>
+              <tr><td>Interest timing method</td><td>Full period on purchase cost; average balance (50%) on feeding/operating costs — charged on the financed portion only</td></tr>
+              <tr><td>Equity basis used for returns (ROE)</td><td id="d_roeEquityBasis">—</td></tr>
+              <tr><td>IRR basis</td><td>Project IRR — total capital deployed vs. gross sale proceeds, annualized</td></tr>
               <tr><td>Contracts needed (calc basis)</td><td id="d_contractsBasis">—</td></tr>
             </tbody>
           </table>
@@ -638,6 +815,17 @@
   </div>
 
   <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true"></section>
+
+  <div class="mobileStickyBar" id="mobileStickyBar" aria-hidden="true">
+    <div class="mobileStickyItem" id="mStickyItemPlPerHd">
+      <span class="k">P/L per head</span>
+      <span class="v" id="mStickyPlPerHd">—</span>
+    </div>
+    <div class="mobileStickyItem" id="mStickyItemTotalPL">
+      <span class="k">Total P/L</span>
+      <span class="v" id="mStickyTotalPL">—</span>
+    </div>
+  </div>
 
   <script src="./app.js"></script>
 

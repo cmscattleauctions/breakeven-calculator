@@ -5,6 +5,7 @@
   // ===================== State =====================
   let quickRun = false;
   let adgInputMode = true; // true = input ADG (dof calculated); false = input Days on Feed (adg calculated)
+  let equityExpanderOpen = false; // visual only — never affects the stored equity value
   const BASIS_DEFAULT = "";
 
   // ===================== Formatting =====================
@@ -14,8 +15,83 @@
   }
   const moneyPerCwt = (x) => isFinite(x) ? `${money(x)} /cwt` : "—";
   const moneyPerHd  = (x) => isFinite(x) ? `${money(x)} /hd` : "—";
+  const moneyPerHdDay = (x) => isFinite(x) ? `${money(x)} /hd/day` : "—";
   const pct         = (x) => isFinite(x) ? (x * 100).toFixed(2) + "%" : "—";
   const fmtNum      = (x, d=2) => isFinite(x) ? Number(x).toFixed(d) : "—";
+  function fmtPctShort(x){
+    if (!isFinite(x)) return "0";
+    return String(Math.round(x * 100) / 100);
+  }
+
+  // ===================== Pure financial math =====================
+  // These functions take plain numbers and return plain numbers/objects —
+  // no DOM access — so they can be unit tested directly (see tests/finance.test.js).
+
+  // Resolves a scenario-link "eq" query value into a valid equity percentage.
+  // Missing, empty, non-numeric, or out-of-range values fall back to 0%
+  // (fully financed), matching the app's default financing assumption.
+  function resolveEquityPct(paramValue) {
+    if (paramValue === null || paramValue === undefined || paramValue === "") return 0;
+    const n = Number(paramValue);
+    if (!isFinite(n)) return 0;
+    return Math.min(100, Math.max(0, n));
+  }
+
+  // Splits a raw equity % input into a clamped equity/financed percentage
+  // and fraction pair. Out-of-range or non-finite input is treated as 0%
+  // equity (fully financed) — callers that need to surface a validation
+  // message do so separately before calling this.
+  function computeFinancing(equityPctRaw) {
+    const equityPct = isFinite(equityPctRaw) ? Math.min(100, Math.max(0, equityPctRaw)) : 0;
+    const financedPct = 100 - equityPct;
+    return {
+      equityPct,
+      financedPct,
+      equityFraction: equityPct / 100,
+      financedFraction: financedPct / 100
+    };
+  }
+
+  // Per-head cost/interest breakdown. Reuses the existing average-balance
+  // interest method (purchase cost charged interest for the full feeding
+  // period; feed/operating cost charged interest on its average — 50% —
+  // outstanding balance), scaled to the financed share of each cost so
+  // equity capital never accrues interest.
+  function computeCostBreakdown({ inWeight, priceCwt, outWeight, cogNoInterest, deathLossPct, interestRatePct, daysOnFeed, equityPct }) {
+    const gained = outWeight - inWeight;
+    const costPerHd = (inWeight * priceCwt) / 100.0;
+    const deathLoss = deathLossPct / 100.0;
+    const deadLossDollars = deathLoss * costPerHd;
+    const feedCost = gained * cogNoInterest;
+    const perHdCOG = feedCost + deadLossDollars;
+
+    const { financedFraction } = computeFinancing(equityPct);
+    const interestRate = interestRatePct / 100.0;
+    const financedCostPerHd = costPerHd * financedFraction;
+    const financedCOG = perHdCOG * financedFraction;
+
+    const interestPerHd = (((financedCostPerHd + (0.5 * financedCOG)) * interestRate) / 365.0) * daysOnFeed;
+    const totalCostPerHd = costPerHd + perHdCOG + interestPerHd;
+
+    return { gained, costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd };
+  }
+
+  // ROE / Annualized ROE using the equity actually invested under this
+  // financing model (not a hidden hard-coded equity %). Undefined (NaN,
+  // displayed as an em dash) when no equity cash is invested — return on
+  // zero dollars isn't a defined number.
+  function computeReturns({ projectedTotalPL, capitalInvested, equityPct, daysOnFeed }) {
+    const { equityFraction } = computeFinancing(equityPct);
+    const equityInvested = capitalInvested * equityFraction;
+    const roe = (equityInvested > 0) ? (projectedTotalPL / equityInvested) : NaN;
+    const years = daysOnFeed / 365.0;
+    const annualRoe = (isFinite(roe) && years > 0) ? (Math.pow(1 + roe, 1 / years) - 1) : NaN;
+    return { equityInvested, roe, annualRoe };
+  }
+
+  function computePlPerHdPerDay(plPerHd, daysOnFeed) {
+    return (isFinite(plPerHd) && isFinite(daysOnFeed) && daysOnFeed > 0) ? (plPerHd / daysOnFeed) : NaN;
+  }
 
   // ===================== Parsing =====================
   function numOrNaN(id) {
@@ -77,7 +153,7 @@
 
   // ===================== Status coloring =====================
   function applyStatus(plPerHd){
-    const tiles = [$("tilePlPerCwt"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
+    const tiles = [$("tilePlPerHdPerDay"), $("tilePlPerHd"), $("tileTotalPL")].filter(Boolean);
     tiles.forEach(t => t.classList.remove("good","mid","bad"));
     if (!isFinite(plPerHd)) return;
     const cls = (plPerHd >= 50) ? "good" : (plPerHd >= -25 ? "mid" : "bad");
@@ -86,22 +162,90 @@
 
   // ===================== Derived fields =====================
   function applyDofAdgModeUI(){
-    const btn = $("dofAdgModeBtn");
-    if (btn) {
-      btn.textContent = `Input: ${adgInputMode ? "ADG" : "Days on Feed"}`;
-      btn.setAttribute("data-on", adgInputMode ? "true" : "false");
-    }
+    const adgBtn = $("modeAdgBtn");
+    const dofBtn = $("modeDofBtn");
+    if (adgBtn) adgBtn.setAttribute("aria-pressed", adgInputMode ? "true" : "false");
+    if (dofBtn) dofBtn.setAttribute("aria-pressed", adgInputMode ? "false" : "true");
 
     const dofEl = $("daysOnFeed");
     const adgEl = $("adg");
-    if (dofEl) dofEl.readOnly = adgInputMode;
-    if (adgEl) adgEl.readOnly = !adgInputMode;
+    if (dofEl) { dofEl.readOnly = adgInputMode; dofEl.tabIndex = adgInputMode ? -1 : 0; }
+    if (adgEl) { adgEl.readOnly = !adgInputMode; adgEl.tabIndex = adgInputMode ? 0 : -1; }
 
     const dofLabel = $("daysOnFeedLabel");
     if (dofLabel) dofLabel.textContent = "Days on Feed" + (adgInputMode ? " (calculated)" : "");
 
     const adgLabel = $("adgLabel");
     if (adgLabel) adgLabel.textContent = "ADG (lb/day)" + (adgInputMode ? "" : " (calculated)");
+  }
+
+  // ===================== Equity / financing expander =====================
+  function applyEquityExpanderUI(){
+    const panel = $("equityExpanderPanel");
+    const toggle = $("equityExpanderToggle");
+    if (panel) panel.classList.toggle("hidden", !equityExpanderOpen);
+    if (toggle) toggle.setAttribute("aria-expanded", equityExpanderOpen ? "true" : "false");
+  }
+
+  function updateEquitySummary(){
+    const financedEl = $("financedPct");
+    const summaryEl = $("equitySummaryText");
+    const raw = strOrEmpty("equityPct");
+    const num = raw === "" ? 0 : Number(raw);
+    const valid = isFinite(num) && num >= 0 && num <= 100;
+
+    if (!valid) {
+      if (financedEl) financedEl.value = "—";
+      if (summaryEl) summaryEl.textContent = "Enter a value from 0–100%";
+      return;
+    }
+
+    const financedPct = 100 - num;
+    if (financedEl) financedEl.value = fmtPctShort(financedPct);
+    if (summaryEl) summaryEl.textContent = `${fmtPctShort(num)}% equity · ${fmtPctShort(financedPct)}% financed`;
+  }
+
+  // ===================== Ownership clarification =====================
+  // Only labels results that are actually scaled by Head Owned (myHead) —
+  // Projected Total P/L, Capital, Hedging, and Returns. Per-head/per-cwt
+  // figures (P/L per head, Breakeven, Sales Price, P/L per hd/day) are the
+  // same regardless of ownership % and must never carry this note.
+  function updateOwnershipNotes(show, ownershipPct){
+    const text = show ? `Your share · ${fmtPctShort(ownershipPct)}% ownership` : "";
+    ["ownershipNoteHero","ownershipNoteCapital","ownershipNoteHedging","ownershipNoteReturns"].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      el.textContent = text;
+      el.classList.toggle("hidden", !show);
+    });
+  }
+
+  // ===================== Sticky results (desktop) =====================
+  function updateResultsSticky(){
+    const card = document.querySelector(".resultsCard");
+    if (!card) return;
+    const isDesktop = window.matchMedia("(min-width:980px)").matches;
+    if (!isDesktop) { card.classList.remove("stickyFits"); return; }
+
+    card.classList.remove("stickyFits");
+    const margin = 28;
+    const fits = card.scrollHeight <= (window.innerHeight - margin);
+    card.classList.toggle("stickyFits", fits);
+  }
+
+  // ===================== Mobile sticky P/L bar =====================
+  function syncMobileStickyBar(){
+    [["plPerHd","mStickyPlPerHd"], ["projectedTotalPL","mStickyTotalPL"]].forEach(([srcId, dstId]) => {
+      const s = $(srcId), d = $(dstId);
+      if (s && d) d.textContent = s.textContent;
+    });
+
+    [["tilePlPerHd","mStickyItemPlPerHd"], ["tileTotalPL","mStickyItemTotalPL"]].forEach(([heroId, stickyId]) => {
+      const hero = $(heroId), sticky = $(stickyId);
+      if (!hero || !sticky) return;
+      sticky.classList.remove("good","mid","bad");
+      ["good","mid","bad"].forEach(cls => { if (hero.classList.contains(cls)) sticky.classList.add(cls); });
+    });
   }
 
   function updateFeedPeriod(){
@@ -255,12 +399,16 @@
   // ===================== Outputs reset =====================
   function resetOutputs(){
     [
-      "plPerHd","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
+      "plPerHd","plPerHdPerDay","projectedTotalPL","plPerCwt","breakEvenCwt","salesPrice",
       "capitalInvested","cattleSales","roe","annualRoe","irr",
       "contractsNeeded",
       "d_costPerHd","d_deadLossDollars","d_feedCost","d_perHdCOG","d_interestPerHd",
-      "d_totalCostPerHd","d_salesPerHd","d_equityBase","d_myHead","d_contractsBasis"
+      "d_totalCostPerHd","d_salesPerHd","d_myHead","d_contractsBasis",
+      "d_financingBase","d_equityPctDisplay","d_equityInvested","d_financedPctDisplay",
+      "d_borrowedAmount","d_roeEquityBasis"
     ].forEach(id => setText(id, "—"));
+    updateOwnershipNotes(false, 0);
+    $("returnsZeroEquityNote")?.classList.add("hidden");
   }
 
   // ===================== IRR (two-point) =====================
@@ -280,17 +428,19 @@
     ensureBasisDefault();
 
     updateFeedPeriod();
+    updateEquitySummary();
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
-    const equityUsed = 0.30;
+    requestAnimationFrame(() => { updateResultsSticky(); syncMobileStickyBar(); });
 
     const daysOnFeed = numOrNaN("daysOnFeed");
     const interestRatePct = numOrNaN("interestRatePct");
     const interestRate = interestRatePct / 100.0;
 
     const totalHead = numOrNaN("totalHead");
-    const ownership = numOrNaN("ownershipPct") / 100.0;
+    const ownershipPctRaw = numOrNaN("ownershipPct");
+    const ownership = ownershipPctRaw / 100.0;
 
     const inWeight = numOrNaN("inWeight");
     const priceCwt = numOrNaN("priceCwt");
@@ -299,6 +449,8 @@
     const cogNoInterest = numOrNaN("cogNoInterest");
     const deathLossPct = numOrNaN("deathLossPct");
     const deathLoss = deathLossPct / 100.0;
+
+    const equityPctRaw = numOrNaN("equityPct");
 
     const futures = numOrNaN("futures");
     const basis = numOrNaN("basis");
@@ -317,6 +469,14 @@
       renderContractsUI(null, outWeight);
       return null;
     }
+    if (isFinite(equityPctRaw) && (equityPctRaw < 0 || equityPctRaw > 100)) {
+      softError("Equity contribution must be between 0% and 100%.");
+      resetOutputs(); applyStatus(NaN);
+      renderContractsUI(null, outWeight);
+      return null;
+    }
+
+    const equityPct = isFinite(equityPctRaw) ? equityPctRaw : 0;
 
     const haveCore =
       isFinite(daysOnFeed) && daysOnFeed > 0 &&
@@ -335,17 +495,12 @@
       return null;
     }
 
-    const gained = outWeight - inWeight;
+    const {
+      gained, costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd
+    } = computeCostBreakdown({
+      inWeight, priceCwt, outWeight, cogNoInterest, deathLossPct, interestRatePct, daysOnFeed, equityPct
+    });
 
-    const costPerHd = (inWeight * priceCwt) / 100.0;
-    const deadLossDollars = deathLoss * costPerHd;
-    const feedCost = gained * cogNoInterest;
-    const perHdCOG = feedCost + deadLossDollars;
-
-    const interestPerHd =
-      (((costPerHd + (0.5 * perHdCOG)) * interestRate) / 365.0) * daysOnFeed;
-
-    const totalCostPerHd = costPerHd + perHdCOG + interestPerHd;
     const breakEvenCwt = (totalCostPerHd / outWeight) * 100.0;
 
     setText("breakEvenCwt", moneyPerCwt(breakEvenCwt));
@@ -356,11 +511,14 @@
     setText("d_perHdCOG", money(perHdCOG));
     setText("d_interestPerHd", money(interestPerHd));
     setText("d_totalCostPerHd", money(totalCostPerHd));
+    setText("d_equityPctDisplay", fmtPctShort(equityPct) + "%");
+    setText("d_financedPctDisplay", fmtPctShort(100 - equityPct) + "%");
 
     if (!(isFinite(futures) && isFinite(basis))) {
       setText("salesPrice","—");
       setText("plPerCwt","—");
       setText("plPerHd","—");
+      setText("plPerHdPerDay","—");
 
       setText("projectedTotalPL","—");
       setText("capitalInvested","—");
@@ -369,7 +527,12 @@
       setText("annualRoe","—");
       setText("irr","—");
       setText("d_salesPerHd","—");
-      setText("d_equityBase","—");
+      setText("d_financingBase","—");
+      setText("d_equityInvested","—");
+      setText("d_borrowedAmount","—");
+      setText("d_roeEquityBasis","—");
+      updateOwnershipNotes(false, 0);
+      $("returnsZeroEquityNote")?.classList.add("hidden");
 
       applyStatus(NaN);
       renderContractsUI(null, outWeight);
@@ -379,10 +542,12 @@
     const salesPrice = futures + basis;
     const plPerCwt = salesPrice - breakEvenCwt;
     const plPerHd = (plPerCwt * outWeight) / 100.0;
+    const plPerHdPerDay = computePlPerHdPerDay(plPerHd, daysOnFeed);
 
     setText("salesPrice", moneyPerCwt(salesPrice));
     setText("plPerCwt", moneyPerCwt(plPerCwt));
     setText("plPerHd", moneyPerHd(plPerHd));
+    setText("plPerHdPerDay", moneyPerHdDay(plPerHdPerDay));
 
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
@@ -394,9 +559,14 @@
       setText("roe","—");
       setText("annualRoe","—");
       setText("irr","—");
-      setText("d_equityBase","—");
+      setText("d_financingBase","—");
+      setText("d_equityInvested","—");
+      setText("d_borrowedAmount","—");
+      setText("d_roeEquityBasis","—");
       setText("contractsNeeded","—");
       setText("d_contractsBasis","—");
+      updateOwnershipNotes(false, 0);
+      $("returnsZeroEquityNote")?.classList.add("hidden");
       renderContractsUI(null, outWeight);
       applyStatus(plPerHd);
       return null;
@@ -410,7 +580,12 @@
       setText("roe","—");
       setText("annualRoe","—");
       setText("irr","—");
-      setText("d_equityBase","—");
+      setText("d_financingBase","—");
+      setText("d_equityInvested","—");
+      setText("d_borrowedAmount","—");
+      setText("d_roeEquityBasis","—");
+      updateOwnershipNotes(false, 0);
+      $("returnsZeroEquityNote")?.classList.add("hidden");
       renderContractsUI(null, outWeight);
       applyStatus(plPerHd);
       return null;
@@ -426,15 +601,23 @@
     setText("cattleSales", money(cattleSales));
     setText("projectedTotalPL", money(projectedTotalPL));
 
-    const equityBase = capitalInvested * equityUsed;
-    setText("d_equityBase", money(equityBase));
+    const showOwnershipNote = ownershipPctRaw < 100;
+    updateOwnershipNotes(showOwnershipNote, ownershipPctRaw);
 
-    const roe = (equityBase !== 0) ? (projectedTotalPL / equityBase) : NaN;
+    const { equityInvested, roe, annualRoe } = computeReturns({
+      projectedTotalPL, capitalInvested, equityPct, daysOnFeed
+    });
+
+    const borrowedAmount = capitalInvested - equityInvested;
+
+    setText("d_financingBase", money(capitalInvested));
+    setText("d_equityInvested", money(equityInvested));
+    setText("d_borrowedAmount", money(borrowedAmount));
+    setText("d_roeEquityBasis", money(equityInvested));
+
     setText("roe", pct(roe));
-
-    const years = daysOnFeed / 365.0;
-    const annualRoe = (isFinite(roe) && years > 0) ? (Math.pow(1 + roe, 1 / years) - 1) : NaN;
     setText("annualRoe", pct(annualRoe));
+    $("returnsZeroEquityNote")?.classList.toggle("hidden", equityInvested > 0);
 
     let irr = NaN;
     if (inDate && outDate) {
@@ -460,11 +643,13 @@
       cogNoInterest,
       deathLossPct,
       interestRatePct,
+      equityPct,
       futures, basis,
-      breakEvenCwt, salesPrice, plPerCwt, plPerHd,
+      breakEvenCwt, salesPrice, plPerCwt, plPerHd, plPerHdPerDay,
       costPerHd, deadLossDollars, feedCost, perHdCOG, interestPerHd, totalCostPerHd,
       salesPerHd,
       capitalInvested, cattleSales, projectedTotalPL,
+      equityInvested, borrowedAmount,
       roe, annualRoe, irr,
       contracts: cInfo
     };
@@ -630,6 +815,8 @@
       if (v !== "") p.set(key, v);
     }
 
+    p.set("eq", strOrEmpty("equityPct") || "0");
+
     const url = new URL(window.location.href);
     url.search = p.toString();
     return url.toString();
@@ -678,6 +865,8 @@
       if (v !== null && $(id)) $(id).value = v;
     }
 
+    if ($("equityPct")) $("equityPct").value = String(resolveEquityPct(p.get("eq")));
+
     ensureBasisDefault();
   }
 
@@ -714,7 +903,7 @@
 
     const v_plHd = $("plPerHd")?.textContent || "—";
     const v_totalPL = $("projectedTotalPL")?.textContent || "—";
-    const v_plCwt = $("plPerCwt")?.textContent || "—";
+    const v_plHdDay = $("plPerHdPerDay")?.textContent || "—";
 
     const v_be = $("breakEvenCwt")?.textContent || "—";
     const v_sale = $("salesPrice")?.textContent || "—";
@@ -744,6 +933,7 @@
     const i_bas = (strOrEmpty("basis") || "—") + " / cwt";
 
     const i_ir = (strOrEmpty("interestRatePct") || "—") + "%";
+    const i_equity = $("equitySummaryText")?.textContent || "0% equity · 100% financed";
 
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const W = 612;
@@ -814,10 +1004,10 @@
     doc.text("P/L PER HEAD", c1x + 14, cardY + 62);
 
     doc.setFont("helvetica","bold"); doc.setFontSize(18); tc(ink);
-    doc.text(v_plCwt, c1x + 14, cardY + 92);
+    doc.text(v_plHdDay, c1x + 14, cardY + 92);
 
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("NET MARGIN / CWT", c1x + 14, cardY + 110);
+    doc.text("P/L PER HEAD / DAY", c1x + 14, cardY + 110);
 
     const rightTopY = cardY + 26;
 
@@ -921,15 +1111,19 @@
 
     y = boxY + boxH + 12;
 
-    rrect(doc, margin, y, W - margin*2, 48, 10, white, border);
+    rrect(doc, margin, y, W - margin*2, 66, 10, white, border);
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
     doc.text("Financing", margin + 10, y + 18);
     doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
     doc.text("Interest Rate:", margin + 10, y + 36);
     doc.setFont("helvetica","bold"); tc(ink);
     doc.text(i_ir, margin + 98, y + 36);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
+    doc.text("Equity / Financed:", margin + 10, y + 54);
+    doc.setFont("helvetica","bold"); tc(ink);
+    doc.text(i_equity, margin + 122, y + 54);
 
-    y += 60;
+    y += 78;
 
     rrect(doc, margin, y, W - margin*2, 56, 12, white, border);
     doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
@@ -954,13 +1148,17 @@
     if ($("ownershipPct")) $("ownershipPct").value = "100";
 
     if ($("interestRatePct")) $("interestRatePct").value = "7.25";
-    if ($("cogNoInterest")) $("cogNoInterest").value = "1.10";
-    if ($("deathLossPct")) $("deathLossPct").value = "1.0";
+    if ($("cogNoInterest")) $("cogNoInterest").value = "";
+    if ($("deathLossPct")) $("deathLossPct").value = "";
     if ($("basis")) $("basis").value = "0";
 
     if ($("daysOnFeed")) $("daysOnFeed").value = "";
     if ($("adg")) $("adg").value = "";
     if ($("outDateInline")) $("outDateInline").value = "—";
+
+    if ($("equityPct")) $("equityPct").value = "0";
+    equityExpanderOpen = false;
+    applyEquityExpanderUI();
 
     clearError();
     resetOutputs();
@@ -977,8 +1175,7 @@
     if ($("ownershipPct") && !$("ownershipPct").value) $("ownershipPct").value = "100";
 
     if ($("interestRatePct") && !$("interestRatePct").value) $("interestRatePct").value = "7.25";
-    if ($("cogNoInterest") && !$("cogNoInterest").value) $("cogNoInterest").value = "1.10";
-    if ($("deathLossPct") && !$("deathLossPct").value) $("deathLossPct").value = "1.0";
+    if ($("equityPct") && !$("equityPct").value) $("equityPct").value = "0";
 
 
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
@@ -1013,7 +1210,7 @@
 
     const ids = [
       "inDate","daysOnFeed","adg","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
-      "cogNoInterest","deathLossPct","interestRatePct","futures","basis"
+      "cogNoInterest","deathLossPct","interestRatePct","equityPct","futures","basis"
     ];
     ids.forEach(id => {
       const el = $(id);
@@ -1030,18 +1227,61 @@
       updateAll();
     });
 
-    $("dofAdgModeBtn")?.addEventListener("click", () => {
-      adgInputMode = !adgInputMode;
+    $("modeAdgBtn")?.addEventListener("click", () => {
+      adgInputMode = true;
       applyDofAdgModeUI();
       updateAll();
+    });
+
+    $("modeDofBtn")?.addEventListener("click", () => {
+      adgInputMode = false;
+      applyDofAdgModeUI();
+      updateAll();
+    });
+
+    $("equityExpanderToggle")?.addEventListener("click", () => {
+      equityExpanderOpen = !equityExpanderOpen;
+      applyEquityExpanderUI();
+    });
+
+    $("plPerHdPerDayInfoBtn")?.addEventListener("click", () => {
+      const txt = $("plPerHdPerDayInfoText");
+      const btn = $("plPerHdPerDayInfoBtn");
+      if (!txt || !btn) return;
+      const show = txt.classList.contains("hidden");
+      txt.classList.toggle("hidden", !show);
+      btn.setAttribute("aria-expanded", show ? "true" : "false");
     });
 
     $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
     $("shareScenarioBtn")?.addEventListener("click", shareScenario);
 
+    $("detailsPanel")?.addEventListener("toggle", () => updateResultsSticky());
+    window.addEventListener("resize", () => updateResultsSticky());
+
     applyQuickRunUI();
     applyDofAdgModeUI();
+    applyEquityExpanderUI();
     updateAll();
   });
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      resolveEquityPct,
+      computeFinancing,
+      computeCostBreakdown,
+      computeReturns,
+      computePlPerHdPerDay,
+      irrTwoPoint,
+      fmtPctShort,
+      // DOM-driving functions, exposed for integration tests against a
+      // fake document (see tests/fake-dom.js). Never referenced by any
+      // browser code path — safe to include here unconditionally.
+      updateAll,
+      resetAll,
+      applyScenarioFromUrl,
+      buildScenarioUrl
+    };
+  }
 
 })();
