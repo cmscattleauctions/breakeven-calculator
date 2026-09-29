@@ -1265,14 +1265,19 @@
       applyEquityExpanderUI();
     });
 
-    $("plPerHdPerDayInfoBtn")?.addEventListener("click", () => {
-      const txt = $("plPerHdPerDayInfoText");
-      const btn = $("plPerHdPerDayInfoBtn");
-      if (!txt || !btn) return;
-      const show = txt.classList.contains("hidden");
-      txt.classList.toggle("hidden", !show);
-      btn.setAttribute("aria-expanded", show ? "true" : "false");
-    });
+    function wireInfoToggle(btnId, textId){
+      $(btnId)?.addEventListener("click", () => {
+        const txt = $(textId);
+        const btn = $(btnId);
+        if (!txt || !btn) return;
+        const show = txt.classList.contains("hidden");
+        txt.classList.toggle("hidden", !show);
+        btn.setAttribute("aria-expanded", show ? "true" : "false");
+      });
+    }
+    wireInfoToggle("plPerHdPerDayInfoBtn", "plPerHdPerDayInfoText");
+    wireInfoToggle("cogInfoBtn", "cogInfoText");
+    wireInfoToggle("contractsInfoBtn", "contractsTooltip");
 
     $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
     $("shareScenarioBtn")?.addEventListener("click", shareScenario);
