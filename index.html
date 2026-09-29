@@ -77,38 +77,42 @@
     .mobileStickyBar{
       position:fixed;
       left:0; right:0; bottom:0;
-      z-index:500;
+      z-index:9999;
       display:flex;
       gap:1px;
       background:var(--border);
-      box-shadow:0 -2px 10px rgba(15,23,42,.12);
+      box-shadow:0 -3px 14px rgba(15,23,42,.18);
       padding-bottom:env(safe-area-inset-bottom, 0);
-      /* Force its own compositing layer — works around iOS Safari
-         sometimes dropping/flickering fixed-position bars during scroll. */
-      -webkit-transform:translateZ(0);
-      transform:translateZ(0);
+      /* Force its own compositing layer and keep it there — works around
+         iOS Safari sometimes dropping/flickering fixed-position bars
+         during scroll or address-bar show/hide. */
+      -webkit-transform:translate3d(0,0,0);
+      transform:translate3d(0,0,0);
+      -webkit-backface-visibility:hidden;
+      backface-visibility:hidden;
       will-change:transform;
+      isolation:isolate;
     }
     .mobileStickyItem{
       flex:1 1 0;
       background:var(--results-bg);
-      padding:12px 16px 14px;
+      padding:16px 18px 18px;
       display:flex;
       flex-direction:column;
       align-items:flex-start;
-      gap:2px;
+      gap:3px;
       min-width:0;
     }
-    .mobileStickyItem .k{ font-size:12px; color:var(--muted); font-weight:700; }
+    .mobileStickyItem .k{ font-size:13px; color:var(--muted); font-weight:700; }
     .mobileStickyItem .v{
-      font-size:23px;
+      font-size:26px;
       font-weight:900;
       color:#0f172a;
       line-height:1.15;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
       max-width:100%;
+    }
+    @media (min-width:400px){
+      .mobileStickyItem .v{ font-size:30px; }
     }
     .mobileStickyItem.good .v{ color:var(--good-tx); }
     .mobileStickyItem.mid .v{  color:var(--mid-tx); }
@@ -117,7 +121,7 @@
       .mobileStickyBar{ display:none; }
     }
     @media (max-width:979.98px){
-      body{ padding-bottom:88px; }
+      body{ padding-bottom:112px; }
     }
 
     .cardHeader{
