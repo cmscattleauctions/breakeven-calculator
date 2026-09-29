@@ -628,8 +628,8 @@
             <div class="inputSectionTitleRow">
               <div class="inputSectionTitle">Projections</div>
               <div class="segmentedControl" role="group" aria-label="Choose input mode">
-                <button type="button" class="segBtn" id="modeAdgBtn" aria-pressed="true">ADG</button>
-                <button type="button" class="segBtn" id="modeDofBtn" aria-pressed="false">Days on Feed</button>
+                <button type="button" class="segBtn" id="modeAdgBtn" aria-pressed="true" tabindex="-1">ADG</button>
+                <button type="button" class="segBtn" id="modeDofBtn" aria-pressed="false" tabindex="-1">Days on Feed</button>
               </div>
             </div>
 
@@ -656,11 +656,11 @@
 
               <div class="field">
                 <label class="statLabelRow">
-                  <span>Cost of Gain ($/lb)</span>
-                  <button type="button" class="iconBtn" id="cogInfoBtn" aria-expanded="false" aria-controls="cogInfoText" aria-label="What is Cost of Gain?">i</button>
+                  <span>Cost of Gain (Dead's Out) ($/lb)</span>
+                  <button type="button" class="iconBtn" id="cogInfoBtn" tabindex="-1" aria-expanded="false" aria-controls="cogInfoText" aria-label="What is Cost of Gain?">i</button>
                 </label>
                 <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" placeholder="e.g., 1.10" />
-                <div class="infoPopover hidden" id="cogInfoText" role="tooltip">Excludes interest.</div>
+                <div class="infoPopover hidden" id="cogInfoText" role="tooltip">Excludes interest and death loss — death loss is calculated separately below.</div>
               </div>
 
               <div class="field">

@@ -924,7 +924,7 @@
 
     const v_contractsLabel = $("contractsLabel")?.textContent || "Contracts Needed";
     const v_contractsVal = $("contractsNeeded")?.textContent || "—";
-    const v_contractsTip = $("contractsTooltip")?.textContent || "";
+    const v_contractsTip = ($("contractsTooltip")?.textContent || "").replace(/\s+/g, " ").trim();
 
     const v_roe = $("roe")?.textContent || "—";
     const v_aroe = $("annualRoe")?.textContent || "—";
@@ -936,217 +936,239 @@
     const v_dof = strOrEmpty("daysOnFeed") || "—";
     const v_headOwned = quickRun ? "—" : ($("headOwnedTip")?.textContent || "—");
 
+    const i_totalHead = quickRun ? "—" : (strOrEmpty("totalHead") || "—");
+    const ownershipRaw = strOrEmpty("ownershipPct");
+    const i_ownership = quickRun ? "—" : (ownershipRaw ? `${ownershipRaw}%` : "—");
+
     const i_inWt = (strOrEmpty("inWeight") || "—") + " lb";
     const i_outWt = (strOrEmpty("outWeight") || "—") + " lb";
     const i_adg = (strOrEmpty("adg") || "—");
     const i_dl = (strOrEmpty("deathLossPct") || "—") + "%";
 
     const i_purchase = (strOrEmpty("priceCwt") || "—") + " / cwt";
-    const i_cog = (strOrEmpty("cogNoInterest") || "—") + " / lb gain";
+    const i_cog = (strOrEmpty("cogNoInterest") || "—") + " / lb";
     const i_fut = (strOrEmpty("futures") || "—") + " / cwt";
     const i_bas = (strOrEmpty("basis") || "—") + " / cwt";
 
     const i_ir = (strOrEmpty("interestRatePct") || "—") + "%";
     const i_equity = $("equitySummaryText")?.textContent || "0% equity · 100% financed";
 
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
-    const W = 612;
-    const margin = 42;
+    const showOwnershipNote = !quickRun && !($("ownershipNoteCapital")?.classList.contains("hidden") ?? true);
+    const ownershipNoteText = $("ownershipNoteCapital")?.textContent || "";
+    const showZeroEquityNote = !quickRun && !($("returnsZeroEquityNote")?.classList.contains("hidden") ?? true);
+    const zeroEquityNoteText = $("returnsZeroEquityNote")?.textContent || "";
 
+    function statusOf(id){
+      const el = $(id);
+      if (!el) return null;
+      if (el.classList.contains("good")) return "good";
+      if (el.classList.contains("mid")) return "mid";
+      if (el.classList.contains("bad")) return "bad";
+      return null;
+    }
+    const plStatus = statusOf("tilePlPerHd");
+
+    // ===== Layout mirroring the on-screen app: blue header, hero P/L
+    // tiles colored by status, then the same section groups (Pricing,
+    // Capital, Hedging, Returns) and Inputs sections, in the same order. =====
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const W = 612, H = 792;
+    const margin = 40;
+    const contentW = W - margin * 2;
+
+    const pageBg = [247, 249, 252];
     const cmsBlue = [51, 102, 153];
     const muted = [107, 114, 128];
     const ink = [15, 23, 42];
     const border = [219, 227, 239];
-    const white = [255,255,255];
+    const white = [255, 255, 255];
+
+    const statusPalette = {
+      good: { bg: [236, 253, 245], bd: [16, 185, 129], tx: [6, 95, 70] },
+      mid:  { bg: [255, 251, 235], bd: [245, 158, 11], tx: [146, 64, 14] },
+      bad:  { bg: [254, 242, 242], bd: [239, 68, 68],  tx: [127, 29, 29] }
+    };
 
     const tc = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+    const font = (weight, size) => { doc.setFont("helvetica", weight); doc.setFontSize(size); };
 
-    doc.setFillColor(cmsBlue[0], cmsBlue[1], cmsBlue[2]);
-    doc.rect(0, 0, W, 34, "F");
+    let y = 0;
 
-    let y = 34 + 20;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(18);
-    tc(ink); doc.text(scenarioName, margin, y);
-
-    y += 16;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    tc(muted); doc.text("CMS Breakeven Calculator • Lot Economics Summary", margin, y);
-
-    y += 18;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    tc(muted);
-
-    const leftX = margin;
-    const rightX = margin + 260;
-
-    doc.text(`In Date: `, leftX, y);
-    doc.setFont("helvetica", "bold"); tc(ink);
-    doc.text(niceDate(inDate), leftX + 44, y);
-
-    doc.setFont("helvetica", "normal"); tc(muted);
-    doc.text(`Out Date: `, rightX, y);
-    doc.setFont("helvetica", "bold"); tc(ink);
-    doc.text(niceDate(outDate), rightX + 50, y);
-
-    y += 16;
-    doc.setFont("helvetica", "normal"); tc(muted);
-    doc.text(`Days on Feed: `, leftX, y);
-    doc.setFont("helvetica", "bold"); tc(ink);
-    doc.text(v_dof, leftX + 72, y);
-
-    doc.setFont("helvetica", "normal"); tc(muted);
-    doc.text(`Head Owned: `, rightX, y);
-    doc.setFont("helvetica", "bold"); tc(ink);
-    doc.text(String(v_headOwned), rightX + 66, y);
-
-    y += 18;
-
-    const cardGap = 12;
-    const cardW = (W - margin*2 - cardGap) / 2;
-    const cardH = 132;
-    const cardY = y;
-    const c1x = margin;
-    const c2x = margin + cardW + cardGap;
-
-    rrect(doc, c1x, cardY, cardW, cardH, 12, white, border);
-    rrect(doc, c2x, cardY, cardW, cardH, 12, white, border);
-
-    doc.setFont("helvetica", "bold"); doc.setFontSize(28); tc(ink);
-    doc.text(v_plHd.replace(" /hd",""), c1x + 14, cardY + 44);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("P/L PER HEAD", c1x + 14, cardY + 62);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(18); tc(ink);
-    doc.text(v_plHdDay, c1x + 14, cardY + 92);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("P/L PER HEAD / DAY", c1x + 14, cardY + 110);
-
-    const rightTopY = cardY + 26;
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(16); tc(ink);
-    doc.text(quickRun ? "—" : v_contractsVal, c2x + 14, rightTopY);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text(quickRun ? "CONTRACTS NEEDED" : v_contractsLabel.toUpperCase(), c2x + 14, rightTopY + 16);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(28); tc(ink);
-    doc.text(quickRun ? "—" : String(v_totalPL), c2x + 14, cardY + 82);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("TOTAL P/L", c2x + 14, cardY + 100);
-
-    doc.setFont("helvetica","normal"); doc.setFontSize(8); tc(muted);
-    const tipText = quickRun
-      ? "Contracts estimate shown only in Full mode."
-      : (v_contractsTip || "Based on Head Owned. Uses Feeder under 1,000 lb; Live at/over 1,000 lb.");
-    doc.text(doc.splitTextToSize(tipText, cardW - 28), c2x + 14, cardY + 114);
-
-    y = cardY + cardH + 14;
-
-    const perfH = 54;
-    const perfY = y;
-    const perfGap = 10;
-    const perfW = (W - margin*2 - perfGap*2) / 3;
-
-    const p1x = margin;
-    const p2x = margin + perfW + perfGap;
-    const p3x = margin + (perfW + perfGap)*2;
-
-    rrect(doc, p1x, perfY, perfW, perfH, 10, white, border);
-    rrect(doc, p2x, perfY, perfW, perfH, 10, white, border);
-    rrect(doc, p3x, perfY, perfW, perfH, 10, white, border);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("ROE", p1x + 10, perfY + 18);
-    doc.text("ANNUALIZED ROE", p2x + 10, perfY + 18);
-    doc.text("IRR", p3x + 10, perfY + 18);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(14); tc(ink);
-    doc.text(quickRun ? "—" : v_roe,  p1x + 10, perfY + 40);
-    doc.text(quickRun ? "—" : v_aroe, p2x + 10, perfY + 40);
-    doc.text(quickRun ? "—" : v_irr,  p3x + 10, perfY + 40);
-
-    y = perfY + perfH + 14;
-
-    const ccY = y;
-    const ccH = 74;
-    rrect(doc, margin, ccY, W - margin*2, ccH, 12, white, border);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("Capital Invested:", margin + 14, ccY + 24);
-    doc.text("Cattle Sales:",    margin + 14, ccY + 44);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(12); tc(ink);
-    const rightEdge = W - margin - 14;
-
-    doc.text(quickRun ? "—" : v_cap, rightEdge, ccY + 24, { align:"right" });
-    doc.text(quickRun ? "—" : v_sales, rightEdge, ccY + 44, { align:"right" });
-
-    y = ccY + ccH + 14;
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(11); tc(muted);
-    doc.text("Inputs", margin, y);
-    y += 10;
-
-    const boxW = (W - margin*2 - 12) / 2;
-    const boxH = 96;
-    const box1x = margin;
-    const box2x = margin + boxW + 12;
-    const boxY = y;
-
-    rrect(doc, box1x, boxY, boxW, boxH, 10, white, border);
-    rrect(doc, box2x, boxY, boxW, boxH, 10, white, border);
-
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
-    doc.text("Weights & Performance", box1x + 10, boxY + 18);
-    doc.text("Pricing Assumptions", box2x + 10, boxY + 18);
-
-    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
-
-    const rowY1 = boxY + 36;
-    const rowGap = 16;
-
-    function kv(x,y,k,v){
-      doc.setFont("helvetica","normal"); tc(muted); doc.text(k, x, y);
-      doc.setFont("helvetica","bold"); tc(ink); doc.text(v, x + 90, y);
+    function paintPageBg(){
+      doc.setFillColor(pageBg[0], pageBg[1], pageBg[2]);
+      doc.rect(0, 0, W, H, "F");
+    }
+    function newPage(){
+      doc.addPage();
+      paintPageBg();
+      y = margin;
+    }
+    function ensureSpace(needed){
+      if (y + needed > H - margin) newPage();
+    }
+    function sectionLabel(text, yy){
+      font("bold", 9); tc(muted);
+      doc.text(String(text).toUpperCase(), margin, yy);
+      doc.setDrawColor(border[0], border[1], border[2]);
+      doc.line(margin, yy + 6, margin + contentW, yy + 6);
+    }
+    // N evenly-spaced {label, value, status} columns, like a .resultRow
+    function statRow(cols, yy){
+      const gap = 16;
+      const colW = (contentW - gap * (cols.length - 1)) / cols.length;
+      cols.forEach((c, i) => {
+        const x = margin + i * (colW + gap);
+        font("normal", 8); tc(muted);
+        doc.text(String(c.label).toUpperCase(), x, yy);
+        const pal = c.status ? statusPalette[c.status] : null;
+        font("bold", 13); tc(pal ? pal.tx : ink);
+        doc.text(String(c.value), x, yy + 16);
+      });
+    }
+    // A section of label:value rows, two per row, like the Inputs card
+    function inputSection(title, rows, yy){
+      ensureSpace(18 + rows.length * 15 + 14);
+      sectionLabel(title, yy);
+      let yyy = yy + 20;
+      const colGap = 24;
+      const colW = (contentW - colGap) / 2;
+      rows.forEach((pair) => {
+        pair.forEach((kvItem, ci) => {
+          if (!kvItem) return;
+          const x = margin + ci * (colW + colGap);
+          font("normal", 9); tc(muted);
+          doc.text(kvItem[0], x, yyy);
+          font("bold", 9); tc(ink);
+          doc.text(kvItem[1], x + 108, yyy);
+        });
+        yyy += 15;
+      });
+      return yyy + 10;
     }
 
-    kv(box1x + 10, rowY1 + 0, "In Weight:", i_inWt);
-    kv(box1x + 10, rowY1 + rowGap, "Out Weight:", i_outWt);
-    kv(box1x + 10, rowY1 + rowGap*2, "ADG:", i_adg);
-    kv(box1x + 10, rowY1 + rowGap*3, "Death Loss:", i_dl);
+    paintPageBg();
 
-    kv(box2x + 10, rowY1 + 0, "Purchase:", i_purchase);
-    kv(box2x + 10, rowY1 + rowGap, "COG:", i_cog);
-    kv(box2x + 10, rowY1 + rowGap*2, "Futures:", i_fut);
-    kv(box2x + 10, rowY1 + rowGap*3, "Basis:", i_bas);
+    doc.setFillColor(cmsBlue[0], cmsBlue[1], cmsBlue[2]);
+    doc.rect(0, 0, W, 38, "F");
+    font("bold", 15); tc(white);
+    doc.text("CMS Breakeven Calculator", margin, 25);
 
-    y = boxY + boxH + 12;
+    y = 38 + 24;
+    font("bold", 16); tc(ink);
+    doc.text(scenarioName, margin, y);
 
-    rrect(doc, margin, y, W - margin*2, 66, 10, white, border);
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(ink);
-    doc.text("Financing", margin + 10, y + 18);
-    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
-    doc.text("Interest Rate:", margin + 10, y + 36);
-    doc.setFont("helvetica","bold"); tc(ink);
-    doc.text(i_ir, margin + 98, y + 36);
-    doc.setFont("helvetica","normal"); doc.setFontSize(10); tc(muted);
-    doc.text("Equity / Financed:", margin + 10, y + 54);
-    doc.setFont("helvetica","bold"); tc(ink);
-    doc.text(i_equity, margin + 122, y + 54);
+    y += 14;
+    font("normal", 9); tc(muted);
+    doc.text(
+      `In Date ${niceDate(inDate)}   ·   Out Date ${niceDate(outDate)}   ·   Days on Feed ${v_dof}` +
+      (quickRun ? "   ·   Quick Run" : `   ·   ${v_headOwned} head owned`),
+      margin, y
+    );
+    y += 18;
 
-    y += 78;
+    // ---------- Hero tiles (P/L per head, Projected Total P/L) ----------
+    const heroH = 58, heroGap = 10;
+    const heroW = (contentW - heroGap) / 2;
+    const heroPal = plStatus ? statusPalette[plStatus] : { bg: white, bd: border, tx: ink };
 
-    rrect(doc, margin, y, W - margin*2, 56, 12, white, border);
-    doc.setFont("helvetica","bold"); doc.setFontSize(10); tc(muted);
-    doc.text("Break-even:", margin + 14, y + 22);
-    doc.text("Projected Sale:", margin + 14, y + 44);
+    rrect(doc, margin, y, heroW, heroH, 10, heroPal.bg, heroPal.bd);
+    rrect(doc, margin + heroW + heroGap, y, heroW, heroH, 10, heroPal.bg, heroPal.bd);
 
-    doc.setFont("helvetica","bold"); doc.setFontSize(12); tc(ink);
-    doc.text(v_be, rightEdge, y + 22, { align:"right" });
-    doc.text(v_sale, rightEdge, y + 44, { align:"right" });
+    font("normal", 9); tc(heroPal.tx);
+    doc.text("P/L PER HEAD", margin + 14, y + 20);
+    doc.text("PROJECTED TOTAL P/L", margin + heroW + heroGap + 14, y + 20);
+
+    font("bold", 21); tc(heroPal.tx);
+    doc.text(v_plHd, margin + 14, y + 44);
+    doc.text(String(v_totalPL), margin + heroW + heroGap + 14, y + 44);
+
+    y += heroH + 18;
+
+    // ---------- Pricing ----------
+    sectionLabel("Pricing", y);
+    y += 22;
+    statRow([
+      { label: "Breakeven ($/cwt)", value: v_be },
+      { label: "Projected Sales Price", value: v_sale },
+      { label: "P/L /hd/day", value: v_plHdDay, status: plStatus }
+    ], y);
+    y += 28;
+
+    if (!quickRun) {
+      // ---------- Capital ----------
+      sectionLabel("Capital", y);
+      y += 20;
+      if (showOwnershipNote) {
+        font("bold", 8); tc(muted);
+        doc.text(ownershipNoteText, margin, y);
+        y += 14;
+      }
+      statRow([
+        { label: "Capital Invested", value: v_cap },
+        { label: "Cattle Sales", value: v_sales }
+      ], y);
+      y += 28;
+
+      // ---------- Hedging ----------
+      sectionLabel("Hedging", y);
+      y += 20;
+      font("normal", 8); tc(muted);
+      doc.text(v_contractsLabel.toUpperCase(), margin, y);
+      font("bold", 13); tc(ink);
+      doc.text(v_contractsVal, margin, y + 16);
+      if (v_contractsTip) {
+        font("normal", 8); tc(muted);
+        const wrapped = doc.splitTextToSize(v_contractsTip, contentW);
+        doc.text(wrapped, margin, y + 30);
+        y += 30 + wrapped.length * 10;
+      } else {
+        y += 26;
+      }
+      y += 8;
+
+      // ---------- Returns ----------
+      sectionLabel("Returns", y);
+      y += 22;
+      statRow([
+        { label: "ROE", value: v_roe },
+        { label: "Annualized ROE", value: v_aroe },
+        { label: "IRR", value: v_irr }
+      ], y);
+      y += 20;
+      if (showZeroEquityNote) {
+        font("normal", 8); tc(muted);
+        const wrapped = doc.splitTextToSize(zeroEquityNoteText, contentW);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 10 + 6;
+      }
+      y += 10;
+    }
+
+    // ---------- Inputs (mirrors the on-screen Inputs card sections) ----------
+    ensureSpace(30);
+    font("bold", 11); tc(ink);
+    doc.text("Inputs", margin, y);
+    y += 16;
+
+    y = inputSection("Cattle & Ownership", [
+      [["In Date:", niceDate(inDate)], ["Total Head:", i_totalHead]],
+      [["Ownership:", i_ownership], ["Head Owned:", String(v_headOwned)]],
+      [["In Weight:", i_inWt], ["Purchase Price:", i_purchase]]
+    ], y);
+
+    y = inputSection("Projections", [
+      [["Out Weight:", i_outWt], ["ADG:", i_adg]],
+      [["Days on Feed:", v_dof], ["Out Date:", niceDate(outDate)]],
+      [["Cost of Gain (Dead's Out):", i_cog], ["Death Loss:", i_dl]]
+    ], y);
+
+    y = inputSection("Financing", [
+      [["Interest Rate:", i_ir], ["Equity / Financed:", i_equity]]
+    ], y);
+
+    y = inputSection("Market Assumptions", [
+      [["Futures:", i_fut], ["Expected Basis:", i_bas]]
+    ], y);
 
     doc.save(`${filename}.pdf`);
   }
