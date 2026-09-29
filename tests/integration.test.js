@@ -47,8 +47,9 @@ test("updateAll: fully financed (0% equity, default) produces a breakeven consis
     daysOnFeed: result.daysOnFeed, equityPct: 0
   });
   approx(result.breakEvenCwt, (expected.totalCostPerHd / 1450) * 100, 1e-6);
-  assert.equal(env.get("roe").textContent, "—", "0% equity → ROE is undefined, shown as an em dash");
-  assert.equal(env.get("returnsZeroEquityNote").classList.contains("hidden"), false, "zero-equity explanation should be visible");
+  assert.notEqual(env.get("roe").textContent, "—", "0% equity → ROE falls back to Return on Total Capital, not a blank dash");
+  assert.ok(!/NaN|Infinity/.test(env.get("roe").textContent));
+  assert.equal(env.get("returnsZeroEquityNote").classList.contains("hidden"), false, "the Return-on-Total-Capital explanation should be visible");
 });
 
 test("updateAll: raising equity to 30% lowers interest/total cost and defines ROE", () => {

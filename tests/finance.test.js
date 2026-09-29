@@ -130,15 +130,19 @@ test("computeCostBreakdown: never charges interest on the equity portion (no ban
 
 // ===================== computeReturns (ROE / Annualized ROE) =====================
 
-test("computeReturns: zero equity invested yields undefined ROE, not Infinity", () => {
-  const r = computeReturns({ projectedTotalPL: 15000, capitalInvested: 100000, equityPct: 0, daysOnFeed: 180 });
+test("computeReturns: zero equity invested falls back to Return on Total Capital, never Infinity/NaN", () => {
+  const r = computeReturns({ projectedTotalPL: 15000, capitalInvested: 100000, equityPct: 0, daysOnFeed: 365 });
   assert.equal(r.equityInvested, 0);
-  assert.ok(Number.isNaN(r.roe), "ROE must be NaN (→ em dash), never Infinity");
-  assert.ok(Number.isNaN(r.annualRoe));
+  assert.equal(r.usingTotalCapitalBasis, true);
+  approx(r.roeBasis, 100000);
+  approx(r.roe, 0.15); // 15000 / 100000 — same number a 100%-equity scenario would show
+  assert.ok(isFinite(r.roe), "ROE must be a real number, never Infinity");
+  approx(r.annualRoe, r.roe, 1e-9);
 });
 
 test("computeReturns: 30% equity uses equity invested (not a hidden hard-coded %) as the ROE basis", () => {
   const r = computeReturns({ projectedTotalPL: 15000, capitalInvested: 100000, equityPct: 30, daysOnFeed: 365 });
+  assert.equal(r.usingTotalCapitalBasis, false);
   approx(r.equityInvested, 30000);
   approx(r.roe, 0.5); // 15000 / 30000
   // With exactly 365 days (1 year), annualizing a 1-year return is a no-op.

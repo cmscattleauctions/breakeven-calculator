@@ -83,10 +83,18 @@
   function computeReturns({ projectedTotalPL, capitalInvested, equityPct, daysOnFeed }) {
     const { equityFraction } = computeFinancing(equityPct);
     const equityInvested = capitalInvested * equityFraction;
-    const roe = (equityInvested > 0) ? (projectedTotalPL / equityInvested) : NaN;
+
+    // With no cash equity invested, "return on equity" has no denominator.
+    // Fall back to Return on Total Capital (unlevered) — profit relative to
+    // the full cost of the cattle — which is always well-defined and never
+    // silently shown as Infinity. Any equity above $0 uses true equity ROE.
+    const usingTotalCapitalBasis = !(equityInvested > 0);
+    const roeBasis = usingTotalCapitalBasis ? capitalInvested : equityInvested;
+
+    const roe = (roeBasis > 0) ? (projectedTotalPL / roeBasis) : NaN;
     const years = daysOnFeed / 365.0;
     const annualRoe = (isFinite(roe) && years > 0) ? (Math.pow(1 + roe, 1 / years) - 1) : NaN;
-    return { equityInvested, roe, annualRoe };
+    return { equityInvested, roe, annualRoe, usingTotalCapitalBasis, roeBasis };
   }
 
   function computePlPerHdPerDay(plPerHd, daysOnFeed) {
@@ -610,7 +618,7 @@
     const showOwnershipNote = ownershipPctRaw < 100;
     updateOwnershipNotes(showOwnershipNote, ownershipPctRaw);
 
-    const { equityInvested, roe, annualRoe } = computeReturns({
+    const { equityInvested, roe, annualRoe, usingTotalCapitalBasis, roeBasis } = computeReturns({
       projectedTotalPL, capitalInvested, equityPct, daysOnFeed
     });
 
@@ -619,11 +627,11 @@
     setText("d_financingBase", money(capitalInvested));
     setText("d_equityInvested", money(equityInvested));
     setText("d_borrowedAmount", money(borrowedAmount));
-    setText("d_roeEquityBasis", money(equityInvested));
+    setText("d_roeEquityBasis", money(roeBasis));
 
     setText("roe", pct(roe));
     setText("annualRoe", pct(annualRoe));
-    $("returnsZeroEquityNote")?.classList.toggle("hidden", equityInvested > 0);
+    $("returnsZeroEquityNote")?.classList.toggle("hidden", !usingTotalCapitalBasis);
 
     let irr = NaN;
     if (inDate && outDate) {
