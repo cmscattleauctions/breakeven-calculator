@@ -247,21 +247,6 @@
     card.classList.toggle("stickyFits", fits);
   }
 
-  // ===================== Mobile sticky P/L bar =====================
-  function syncMobileStickyBar(){
-    [["plPerHd","mStickyPlPerHd"], ["projectedTotalPL","mStickyTotalPL"]].forEach(([srcId, dstId]) => {
-      const s = $(srcId), d = $(dstId);
-      if (s && d) d.textContent = s.textContent;
-    });
-
-    [["tilePlPerHd","mStickyItemPlPerHd"], ["tileTotalPL","mStickyItemTotalPL"]].forEach(([heroId, stickyId]) => {
-      const hero = $(heroId), sticky = $(stickyId);
-      if (!hero || !sticky) return;
-      sticky.classList.remove("good","mid","bad");
-      ["good","mid","bad"].forEach(cls => { if (hero.classList.contains(cls)) sticky.classList.add(cls); });
-    });
-  }
-
   // ===================== Shrink-to-fit big numbers =====================
   // Never wraps (the element is white-space:nowrap in CSS) — instead steps
   // the font size down until the text fits on one line within its box.
@@ -277,8 +262,6 @@
   function fitBigValues(){
     fitValueText($("plPerHd"), 27, 13);
     fitValueText($("projectedTotalPL"), 27, 13);
-    fitValueText($("mStickyPlPerHd"), 24, 12);
-    fitValueText($("mStickyTotalPL"), 24, 12);
   }
 
   function updateFeedPeriod(){
@@ -465,7 +448,7 @@
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
-    requestAnimationFrame(() => { updateResultsSticky(); syncMobileStickyBar(); fitBigValues(); });
+    requestAnimationFrame(() => { updateResultsSticky(); fitBigValues(); });
 
     const daysOnFeed = numOrNaN("daysOnFeed");
     const interestRatePct = numOrNaN("interestRatePct");
@@ -1236,8 +1219,8 @@
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
-    const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 1.0, decimals: 0 });
-    const eqVals  = rangeValues({ start: 0.0,  end: 100.0, step: 1.0,  decimals: 0 });
+    const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 5.0, decimals: 0 });
+    const eqVals  = rangeValues({ start: 0.0,  end: 100.0, step: 5.0,  decimals: 0 });
 
     attachMobilePicker("interestRatePct", {
       title:"Interest Rate (%)",

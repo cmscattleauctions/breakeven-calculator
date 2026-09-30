@@ -75,54 +75,6 @@
       }
     }
 
-    .mobileStickyBar{
-      position:fixed;
-      left:0; right:0; bottom:0;
-      z-index:9999;
-      display:flex;
-      gap:1px;
-      background:var(--border);
-      box-shadow:0 -3px 14px rgba(15,23,42,.18);
-      padding-bottom:env(safe-area-inset-bottom, 0);
-      /* Force its own compositing layer and keep it there — works around
-         iOS Safari sometimes dropping/flickering fixed-position bars
-         during scroll or address-bar show/hide. */
-      -webkit-transform:translate3d(0,0,0);
-      transform:translate3d(0,0,0);
-      -webkit-backface-visibility:hidden;
-      backface-visibility:hidden;
-      will-change:transform;
-      isolation:isolate;
-    }
-    .mobileStickyItem{
-      flex:1 1 0;
-      background:var(--results-bg);
-      padding:14px 14px 16px;
-      display:flex;
-      flex-direction:column;
-      align-items:flex-start;
-      gap:3px;
-      min-width:0;
-    }
-    .mobileStickyItem .k{ font-size:13px; color:var(--muted); font-weight:700; }
-    .mobileStickyItem .v{
-      font-size:24px;
-      font-weight:900;
-      color:#0f172a;
-      line-height:1.15;
-      max-width:100%;
-      white-space:nowrap;
-      overflow:hidden;
-    }
-    .mobileStickyItem.good .v{ color:var(--good-tx); }
-    .mobileStickyItem.mid .v{  color:var(--mid-tx); }
-    .mobileStickyItem.bad .v{  color:var(--bad-tx); }
-    @media (min-width:980px){
-      .mobileStickyBar{ display:none; }
-    }
-    @media (max-width:979.98px){
-      body{ padding-bottom:112px; }
-    }
 
     .cardHeader{
       display:flex;
@@ -283,9 +235,11 @@
 
     .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     .inputSectionGrid.threeCol .inDateField{ grid-column:1 / -1; }
+    .inDateField input{ max-width:280px; }
     @media (min-width:760px){
       .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr); }
       .inputSectionGrid.threeCol .inDateField{ grid-column:auto; }
+      .inDateField input{ max-width:none; }
     }
 
     .fieldInlineRow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -639,14 +593,16 @@
             </div>
 
             <div class="inputSectionGrid">
-              <div class="field">
-                <label>Out Weight (lb)</label>
-                <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
-              </div>
+              <div class="pairRow fieldSpan2">
+                <div class="field">
+                  <label>Out Weight (lb)</label>
+                  <input id="outWeight" type="number" inputmode="decimal" placeholder="e.g., 1450" />
+                </div>
 
-              <div class="field">
-                <label id="adgLabel">ADG (lb/day)</label>
-                <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
+                <div class="field">
+                  <label id="adgLabel">ADG (lb/day)</label>
+                  <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
+                </div>
               </div>
 
               <div class="pairRow fieldSpan2">
@@ -664,7 +620,7 @@
               <div class="pairRow fieldSpan2">
                 <div class="field">
                   <label class="statLabelRow">
-                    <span>Cost of Gain (Dead's Out) ($/lb)</span>
+                    <span>COG (Dead's Out) ($/lb)</span>
                     <button type="button" class="iconBtn" id="cogInfoBtn" tabindex="-1" aria-expanded="false" aria-controls="cogInfoText" aria-label="What is Cost of Gain?">i</button>
                   </label>
                   <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" placeholder="e.g., 1.10" />
@@ -698,10 +654,10 @@
                 </div>
 
                 <div class="equityExpanderPanel hidden" id="equityExpanderPanel">
-                  <div class="inputSectionGrid">
+                  <div class="pairRow">
                     <div class="field">
                       <label for="equityPct">Equity Contribution (%)</label>
-                      <input id="equityPct" type="number" step="1" min="0" max="100" inputmode="decimal" placeholder="0" value="0" />
+                      <input id="equityPct" type="number" step="5" min="0" max="100" inputmode="decimal" placeholder="0" value="0" />
                     </div>
                     <div class="field">
                       <label>Financed (%)</label>
@@ -723,7 +679,7 @@
 
               <div class="field">
                 <label>Expected Basis ($/cwt)</label>
-                <input id="basis" type="number" step="1" min="-100" max="100" inputmode="decimal" value="0" />
+                <input id="basis" type="number" step="5" min="-100" max="100" inputmode="decimal" value="0" />
               </div>
             </div>
           </div>
@@ -884,17 +840,6 @@
   </div>
 
   <section class="pdfTemplate" id="pdfTemplate" aria-hidden="true"></section>
-
-  <div class="mobileStickyBar" id="mobileStickyBar" aria-hidden="true">
-    <div class="mobileStickyItem" id="mStickyItemPlPerHd">
-      <span class="k">P/L per head</span>
-      <span class="v" id="mStickyPlPerHd">—</span>
-    </div>
-    <div class="mobileStickyItem" id="mStickyItemTotalPL">
-      <span class="k">Total P/L</span>
-      <span class="v" id="mStickyTotalPL">—</span>
-    </div>
-  </div>
 
   <script src="./app.js"></script>
 
