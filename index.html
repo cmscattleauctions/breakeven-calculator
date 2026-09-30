@@ -270,12 +270,22 @@
       .inputSectionGrid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     }
     .inputSectionGrid .fieldSpan2{ grid-column:1 / -1; }
-    .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr); }
-    @media (min-width:520px){
-      .inputSectionGrid.threeCol{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+    /* Always two columns, regardless of viewport — for field pairs that
+       should stay side-by-side even on a narrow phone. Nest with
+       fieldSpan2 inside a responsive .inputSectionGrid to span its full
+       row, or use standalone when a section is just one pair. */
+    .pairRow{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      gap:8px 14px;
     }
+
+    .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .inputSectionGrid.threeCol .inDateField{ grid-column:1 / -1; }
     @media (min-width:760px){
       .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr); }
+      .inputSectionGrid.threeCol .inDateField{ grid-column:auto; }
     }
 
     .fieldInlineRow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -585,7 +595,7 @@
           <div class="inputSection">
             <div class="inputSectionTitle">Cattle &amp; Ownership</div>
             <div class="inputSectionGrid threeCol">
-              <div class="field">
+              <div class="field inDateField">
                 <label>In Date</label>
                 <input id="inDate" type="date" />
               </div>
@@ -606,7 +616,7 @@
               </div>
             </div>
 
-            <div class="inputSectionGrid" style="margin-top:8px;">
+            <div class="pairRow" style="margin-top:8px;">
               <div class="field">
                 <label>In Weight (lb)</label>
                 <input id="inWeight" type="number" inputmode="decimal" placeholder="e.g., 850" />
@@ -639,28 +649,32 @@
                 <input id="adg" type="text" inputmode="decimal" placeholder="e.g., 3.50" />
               </div>
 
-              <div class="field">
-                <label id="daysOnFeedLabel">Days on Feed (calculated)</label>
-                <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly tabindex="-1" value="—" />
+              <div class="pairRow fieldSpan2">
+                <div class="field">
+                  <label id="daysOnFeedLabel">Days on Feed (calculated)</label>
+                  <input id="daysOnFeed" type="text" inputmode="numeric" placeholder="e.g., 180" readonly tabindex="-1" value="—" />
+                </div>
+
+                <div class="field">
+                  <label>Out Date</label>
+                  <input id="outDateInline" type="text" readonly tabindex="-1" value="—" />
+                </div>
               </div>
 
-              <div class="field">
-                <label>Out Date</label>
-                <input id="outDateInline" type="text" readonly tabindex="-1" value="—" />
-              </div>
+              <div class="pairRow fieldSpan2">
+                <div class="field">
+                  <label class="statLabelRow">
+                    <span>Cost of Gain (Dead's Out) ($/lb)</span>
+                    <button type="button" class="iconBtn" id="cogInfoBtn" tabindex="-1" aria-expanded="false" aria-controls="cogInfoText" aria-label="What is Cost of Gain?">i</button>
+                  </label>
+                  <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" placeholder="e.g., 1.10" />
+                  <div class="infoPopover hidden" id="cogInfoText" role="tooltip">Excludes interest and death loss — death loss is calculated separately below.</div>
+                </div>
 
-              <div class="field">
-                <label class="statLabelRow">
-                  <span>Cost of Gain (Dead's Out) ($/lb)</span>
-                  <button type="button" class="iconBtn" id="cogInfoBtn" tabindex="-1" aria-expanded="false" aria-controls="cogInfoText" aria-label="What is Cost of Gain?">i</button>
-                </label>
-                <input id="cogNoInterest" type="number" step="0.01" min="0.75" max="1.50" inputmode="decimal" placeholder="e.g., 1.10" />
-                <div class="infoPopover hidden" id="cogInfoText" role="tooltip">Excludes interest and death loss — death loss is calculated separately below.</div>
-              </div>
-
-              <div class="field">
-                <label>Death Loss (%)</label>
-                <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g., 1.0" />
+                <div class="field">
+                  <label>Death Loss (%)</label>
+                  <input id="deathLossPct" type="number" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g., 1.0" />
+                </div>
               </div>
             </div>
           </div>
@@ -701,7 +715,7 @@
 
           <div class="inputSection">
             <div class="inputSectionTitle">Market Assumptions</div>
-            <div class="inputSectionGrid">
+            <div class="pairRow">
               <div class="field">
                 <label>Futures ($/cwt)</label>
                 <input id="futures" type="number" inputmode="decimal" placeholder="e.g., 230" />
