@@ -15,7 +15,6 @@
   }
   const moneyPerCwt = (x) => isFinite(x) ? `${money(x)} /cwt` : "—";
   const moneyPerHd  = (x) => isFinite(x) ? `${money(x)} /hd` : "—";
-  const moneyPerHdDay = (x) => isFinite(x) ? `${money(x)} /hd/day` : "—";
   const pct         = (x) => isFinite(x) ? (x * 100).toFixed(2) + "%" : "—";
   const fmtNum      = (x, d=2) => isFinite(x) ? Number(x).toFixed(d) : "—";
   function fmtPctShort(x){
@@ -385,13 +384,9 @@
     if (basisCell) basisCell.textContent = msg;
 
     // Supporting line uses only data already computed elsewhere (contract
-    // size from the hedging calc, futures price from Market Assumptions) —
-    // no new calculation logic.
+    // size from the hedging calc) — no new calculation logic.
     if (supporting) {
-      const futures = numOrNaN("futures");
-      supporting.textContent = isFinite(futures)
-        ? `Based on ${info.denomLb.toLocaleString()} lbs hedged at ${money(futures)}/cwt`
-        : "";
+      supporting.textContent = `Based on ${info.denomLb.toLocaleString()} lbs`;
     }
   }
 
@@ -575,7 +570,7 @@
     setText("salesPrice", moneyPerCwt(salesPrice));
     setText("plPerCwt", moneyPerCwt(plPerCwt));
     setText("plPerHd", moneyPerHd(plPerHd));
-    setText("plPerHdPerDay", moneyPerHdDay(plPerHdPerDay));
+    setText("plPerHdPerDay", money(plPerHdPerDay));
 
     const salesPerHd = (salesPrice * outWeight) / 100.0;
     setText("d_salesPerHd", money(salesPerHd));
@@ -903,12 +898,6 @@
     return String(name).trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   }
 
-  function rrect(doc, x,y,w,h,r, fillRGB, strokeRGB){
-    if (strokeRGB) doc.setDrawColor(strokeRGB[0],strokeRGB[1],strokeRGB[2]);
-    if (fillRGB) doc.setFillColor(fillRGB[0],fillRGB[1],fillRGB[2]);
-    doc.roundedRect(x,y,w,h,r,r, fillRGB ? "FD" : "S");
-  }
-
   function downloadPdf() {
     updateAll();
 
@@ -938,7 +927,7 @@
 
     const v_contractsLabel = $("contractsLabel")?.textContent || "Contracts Needed";
     const v_contractsVal = $("contractsNeeded")?.textContent || "—";
-    const v_contractsTip = ($("contractsTooltip")?.textContent || "").replace(/\s+/g, " ").trim();
+    const v_hedgeSupport = ($("hedgeSupportingText")?.textContent || "").replace(/\s+/g, " ").trim();
 
     const v_roe = $("roe")?.textContent || "—";
     const v_aroe = $("annualRoe")?.textContent || "—";
@@ -967,10 +956,8 @@
     const i_ir = (strOrEmpty("interestRatePct") || "—") + "%";
     const i_equity = $("equitySummaryText")?.textContent || "0% equity · 100% financed";
 
-    const showOwnershipNote = !quickRun && !($("ownershipNoteCapital")?.classList.contains("hidden") ?? true);
-    const ownershipNoteText = $("ownershipNoteCapital")?.textContent || "";
     const showZeroEquityNote = !quickRun && !($("returnsZeroEquityNote")?.classList.contains("hidden") ?? true);
-    const zeroEquityNoteText = $("returnsZeroEquityNote")?.textContent || "";
+    const zeroEquityNoteShort = "ROE shown as Return on Total Capital (unlevered) — no equity invested.";
 
     function statusOf(id){
       const el = $(id);
@@ -982,12 +969,12 @@
     }
     const plStatus = statusOf("tilePlPerHd");
 
-    // ===== Layout mirroring the on-screen app: blue header, hero P/L
-    // tiles colored by status, then the same section groups (Pricing,
-    // Capital, Hedging, Returns) and Inputs sections, in the same order. =====
+    // ===== Layout designed as a print/export version of the on-screen app:
+    // white rounded cards, the same section groups, the same design tokens.
+    // No calculation values or logic are touched here — display formatting only. =====
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const W = 612, H = 792;
-    const margin = 40;
+    const margin = 34;
     const contentW = W - margin * 2;
 
     const pageBg = [247, 249, 252];
@@ -996,10 +983,14 @@
     const ink = [15, 23, 42];
     const border = [219, 227, 239];
     const white = [255, 255, 255];
+    const soft = [237, 242, 248];     // pale blue-gray header strip (Scenario Input cards)
+    const hedgeBg = [234, 242, 255];  // pale blue tint, Hedging only
 
+    // "mid" intentionally avoids amber/yellow in this report (spec: no
+    // yellow/orange/tan anywhere in the PDF), unlike the on-screen .mid style.
     const statusPalette = {
       good: { bg: [236, 253, 245], bd: [16, 185, 129], tx: [6, 95, 70] },
-      mid:  { bg: [255, 251, 235], bd: [245, 158, 11], tx: [146, 64, 14] },
+      mid:  { bg: [241, 245, 249], bd: [148, 163, 184], tx: [51, 65, 85] },
       bad:  { bg: [254, 242, 242], bd: [239, 68, 68],  tx: [127, 29, 29] }
     };
 
@@ -1020,169 +1011,255 @@
     function ensureSpace(needed){
       if (y + needed > H - margin) newPage();
     }
-    function sectionLabel(text, yy){
-      font("bold", 9); tc(muted);
-      doc.text(String(text).toUpperCase(), margin, yy);
+    function sectionLabel(text, yy, x, w){
+      x = x ?? margin; w = w ?? contentW;
+      font("bold", 8.5); tc(muted);
+      doc.text(String(text).toUpperCase(), x, yy);
       doc.setDrawColor(border[0], border[1], border[2]);
-      doc.line(margin, yy + 6, margin + contentW, yy + 6);
+      doc.line(x, yy + 5, x + w, yy + 5);
     }
     // N evenly-spaced {label, value, status} columns, like a .resultRow
-    function statRow(cols, yy){
-      const gap = 16;
-      const colW = (contentW - gap * (cols.length - 1)) / cols.length;
+    function statRow(cols, yy, x, w){
+      x = x ?? margin; w = w ?? contentW;
+      const gap = 14;
+      const colW = (w - gap * (cols.length - 1)) / cols.length;
       cols.forEach((c, i) => {
-        const x = margin + i * (colW + gap);
-        font("normal", 8); tc(muted);
-        doc.text(String(c.label).toUpperCase(), x, yy);
+        const cx = x + i * (colW + gap);
+        font("normal", 7.5); tc(muted);
+        doc.text(String(c.label).toUpperCase(), cx, yy);
         const pal = c.status ? statusPalette[c.status] : null;
-        font("bold", 13); tc(pal ? pal.tx : ink);
-        doc.text(String(c.value), x, yy + 16);
+        font("bold", 12); tc(pal ? pal.tx : ink);
+        doc.text(String(c.value), cx, yy + 14);
       });
     }
-    // A section of label:value rows, two per row, like the Inputs card
-    function inputSection(title, rows, yy){
-      ensureSpace(18 + rows.length * 15 + 14);
-      sectionLabel(title, yy);
-      let yyy = yy + 20;
-      const colGap = 24;
-      const colW = (contentW - colGap) / 2;
-      rows.forEach((pair) => {
-        pair.forEach((kvItem, ci) => {
-          if (!kvItem) return;
-          const x = margin + ci * (colW + colGap);
-          font("normal", 9); tc(muted);
-          doc.text(kvItem[0], x, yyy);
-          font("bold", 9); tc(ink);
-          doc.text(kvItem[1], x + 108, yyy);
-        });
-        yyy += 15;
-      });
-      return yyy + 10;
+
+    // A bordered, rounded "Scenario Input" card styled like the web-UI input
+    // cards: a pale header strip, a strong title, and left/right columns of
+    // stacked label-then-value fields (mirrors .inputSection on screen).
+    function inputCard(x, yy, w, title, leftItems, rightItems) {
+      const headerH = 22;
+      const itemH = 24;
+      const padX = 13;
+      const padTop = 9;
+      const rows = Math.max(leftItems.length, rightItems.length);
+      const bodyH = rows * itemH;
+      const cardH = headerH + padTop + bodyH + 9;
+
+      ensureSpace(cardH + 12);
+      const cardY = y;
+
+      doc.setDrawColor(border[0], border[1], border[2]);
+      doc.setFillColor(white[0], white[1], white[2]);
+      doc.roundedRect(x, cardY, w, cardH, 7, 7, "FD");
+
+      doc.setFillColor(soft[0], soft[1], soft[2]);
+      doc.rect(x + 1.5, cardY + 1.5, w - 3, headerH - 3, "F");
+      doc.setDrawColor(border[0], border[1], border[2]);
+      doc.line(x, cardY + headerH, x + w, cardY + headerH);
+
+      font("bold", 11); tc(ink);
+      doc.text(title, x + padX, cardY + headerH / 2 + 4);
+
+      const colGap = 22;
+      const colW = (w - padX * 2 - colGap) / 2;
+      const leftX = x + padX;
+      const rightX = x + padX + colW + colGap;
+      const dividerX = x + padX + colW + colGap / 2;
+
+      doc.setDrawColor(border[0], border[1], border[2]);
+      doc.line(dividerX, cardY + headerH + 7, dividerX, cardY + cardH - 7);
+
+      let rowY = cardY + headerH + padTop + 8;
+      for (let i = 0; i < rows; i++) {
+        if (leftItems[i]) {
+          font("normal", 8.5); tc(muted);
+          doc.text(leftItems[i][0], leftX, rowY);
+          font("bold", 10.5); tc(ink);
+          doc.text(leftItems[i][1], leftX, rowY + 12);
+        }
+        if (rightItems[i]) {
+          font("normal", 8.5); tc(muted);
+          doc.text(rightItems[i][0], rightX, rowY);
+          font("bold", 10.5); tc(ink);
+          doc.text(rightItems[i][1], rightX, rowY + 12);
+        }
+        rowY += itemH;
+      }
+
+      y = cardY + cardH + 7;
     }
 
     paintPageBg();
 
+    // ---------- Header ----------
     doc.setFillColor(cmsBlue[0], cmsBlue[1], cmsBlue[2]);
-    doc.rect(0, 0, W, 38, "F");
-    font("bold", 15); tc(white);
-    doc.text("CMS Breakeven Calculator", margin, 25);
+    doc.rect(0, 0, W, 34, "F");
+    font("bold", 13); tc(white);
+    doc.text("CMS Breakeven Calculator", margin, 22);
+    font("normal", 8.5); tc(white);
+    doc.text(`Generated ${niceDate(new Date())}`, W - margin, 22, { align: "right" });
 
-    y = 38 + 24;
-    font("bold", 16); tc(ink);
+    y = 34 + 22;
+
+    // ---------- Scenario summary ----------
+    font("bold", 15); tc(ink);
     doc.text(scenarioName, margin, y);
+    y += 15;
 
-    y += 14;
-    font("normal", 9); tc(muted);
+    sectionLabel("Scenario", y);
+    y += 15;
+    font("normal", 8.5); tc(muted);
     doc.text(
       `In Date ${niceDate(inDate)}   ·   Out Date ${niceDate(outDate)}   ·   Days on Feed ${v_dof}` +
       (quickRun ? "   ·   Quick Run" : `   ·   ${v_headOwned} head owned`),
       margin, y
     );
-    y += 18;
+    y += 14;
 
-    // ---------- Hero tiles (P/L per head, Projected Total P/L) ----------
-    const heroH = 58, heroGap = 10;
-    const heroW = (contentW - heroGap) / 2;
+    // ---------- Results card (compact) ----------
+    const heroH = 40;
+    const RH = {
+      header: 16,
+      hero: heroH + 10,
+      pricingLabel: 12, pricingRow: 18, pricingGap: 10,
+      bandLabel: 11, bandBody: 40, bandGap: 10,
+      returnsLabel: 12, returnsRow: 18, returnsGap: 6,
+      pad: 11
+    };
+    let resultsBodyH = RH.header + RH.hero + RH.pricingLabel + RH.pricingRow + RH.pricingGap;
+    if (!quickRun) {
+      resultsBodyH += RH.bandLabel + RH.bandBody + RH.bandGap;
+      resultsBodyH += RH.returnsLabel + RH.returnsRow + RH.returnsGap;
+      if (showZeroEquityNote) resultsBodyH += 11;
+    }
+    const resultsCardH = resultsBodyH + RH.pad * 2;
+
+    ensureSpace(resultsCardH + 14);
+    const rCardY = y;
+    doc.setDrawColor(border[0], border[1], border[2]);
+    doc.setFillColor(white[0], white[1], white[2]);
+    doc.roundedRect(margin, rCardY, contentW, resultsCardH, 9, 9, "FD");
+
+    const rX = margin + 13;
+    const rW = contentW - 26;
+    let ry = rCardY + RH.pad;
+
+    font("bold", 11.5); tc(ink);
+    doc.text("Results", rX, ry + 4);
+    ry += RH.header;
+
+    // Hero panel (P/L per head, Projected Total P/L)
+    const heroColW = rW / 2;
     const heroPal = plStatus ? statusPalette[plStatus] : { bg: white, bd: border, tx: ink };
+    doc.setFillColor(heroPal.bg[0], heroPal.bg[1], heroPal.bg[2]);
+    doc.roundedRect(rX, ry, rW, heroH, 7, 7, "F");
+    doc.setDrawColor(border[0], border[1], border[2]);
+    doc.line(rX + heroColW, ry + 7, rX + heroColW, ry + heroH - 7);
 
-    rrect(doc, margin, y, heroW, heroH, 10, heroPal.bg, heroPal.bd);
-    rrect(doc, margin + heroW + heroGap, y, heroW, heroH, 10, heroPal.bg, heroPal.bd);
+    font("normal", 7.5); tc(heroPal.tx);
+    doc.text("P/L PER HEAD", rX + 12, ry + 15);
+    doc.text("PROJECTED TOTAL P/L", rX + heroColW + 12, ry + 15);
+    font("bold", 17); tc(heroPal.tx);
+    doc.text(v_plHd, rX + 12, ry + 32);
+    doc.text(String(v_totalPL), rX + heroColW + 12, ry + 32);
+    ry += RH.hero;
 
-    font("normal", 9); tc(heroPal.tx);
-    doc.text("P/L PER HEAD", margin + 14, y + 20);
-    doc.text("PROJECTED TOTAL P/L", margin + heroW + heroGap + 14, y + 20);
-
-    font("bold", 21); tc(heroPal.tx);
-    doc.text(v_plHd, margin + 14, y + 44);
-    doc.text(String(v_totalPL), margin + heroW + heroGap + 14, y + 44);
-
-    y += heroH + 18;
-
-    // ---------- Pricing ----------
-    sectionLabel("Pricing", y);
-    y += 22;
+    // Pricing
+    sectionLabel("Pricing", ry, rX, rW);
+    ry += RH.pricingLabel;
     statRow([
       { label: "Breakeven ($/cwt)", value: v_be },
       { label: "Projected Sales Price", value: v_sale },
       { label: "P/L /hd/day", value: v_plHdDay, status: plStatus }
-    ], y);
-    y += 28;
+    ], ry, rX, rW);
+    ry += RH.pricingRow + RH.pricingGap;
 
     if (!quickRun) {
-      // ---------- Capital ----------
-      sectionLabel("Capital", y);
-      y += 20;
-      if (showOwnershipNote) {
-        font("bold", 8); tc(muted);
-        doc.text(ownershipNoteText, margin, y);
-        y += 14;
-      }
-      statRow([
-        { label: "Capital Invested", value: v_cap },
-        { label: "Cattle Sales", value: v_sales }
-      ], y);
-      y += 28;
+      // Capital + Hedging band (share one row: Capital left, Hedging right,
+      // Hedging keeps its pale-blue tint per spec)
+      const bandColGap = 16;
+      const bandColW = (rW - bandColGap) / 2;
+      const capX = rX;
+      const hedgeX = rX + bandColW + bandColGap;
 
-      // ---------- Hedging ----------
-      sectionLabel("Hedging", y);
-      y += 20;
-      font("normal", 8); tc(muted);
-      doc.text(v_contractsLabel.toUpperCase(), margin, y);
-      font("bold", 13); tc(ink);
-      doc.text(v_contractsVal, margin, y + 16);
-      if (v_contractsTip) {
-        font("normal", 8); tc(muted);
-        const wrapped = doc.splitTextToSize(v_contractsTip, contentW);
-        doc.text(wrapped, margin, y + 30);
-        y += 30 + wrapped.length * 10;
-      } else {
-        y += 26;
-      }
-      y += 8;
+      font("bold", 8.5); tc(muted);
+      doc.text("CAPITAL", capX, ry);
+      doc.text("HEDGING", hedgeX, ry);
+      ry += RH.bandLabel;
 
-      // ---------- Returns ----------
-      sectionLabel("Returns", y);
-      y += 22;
+      // Hedging tinted panel behind its half only
+      doc.setFillColor(hedgeBg[0], hedgeBg[1], hedgeBg[2]);
+      doc.roundedRect(hedgeX - 6, ry - 3, bandColW + 6, RH.bandBody - 4, 6, 6, "F");
+
+      font("normal", 7.5); tc(muted);
+      doc.text("CAPITAL INVESTED", capX, ry + 8);
+      font("bold", 10.5); tc(ink);
+      doc.text(v_cap, capX, ry + 20);
+      font("normal", 7.5); tc(muted);
+      doc.text("CATTLE SALES", capX + bandColW / 2, ry + 8);
+      font("bold", 10.5); tc(ink);
+      doc.text(v_sales, capX + bandColW / 2, ry + 20);
+
+      font("normal", 7.5); tc(muted);
+      doc.text(v_contractsLabel.toUpperCase(), hedgeX + 4, ry + 8);
+      font("bold", 12); tc(ink);
+      doc.text(v_contractsVal, hedgeX + 4, ry + 21);
+      if (v_hedgeSupport) {
+        font("normal", 7); tc(muted);
+        doc.text(v_hedgeSupport, hedgeX + 4, ry + RH.bandBody - 8);
+      }
+      ry += RH.bandBody + RH.bandGap;
+
+      // Returns
+      sectionLabel("Returns", ry, rX, rW);
+      ry += RH.returnsLabel;
       statRow([
         { label: "ROE", value: v_roe },
         { label: "Annualized ROE", value: v_aroe },
         { label: "IRR", value: v_irr }
-      ], y);
-      y += 30;
+      ], ry, rX, rW);
+      ry += RH.returnsRow;
       if (showZeroEquityNote) {
-        font("normal", 8); tc(muted);
-        const wrapped = doc.splitTextToSize(zeroEquityNoteText, contentW);
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * 10 + 6;
+        font("normal", 7); tc(muted);
+        doc.text(zeroEquityNoteShort, rX, ry + 6);
       }
-      y += 10;
     }
 
-    // ---------- Inputs (mirrors the on-screen Inputs card sections) ----------
-    ensureSpace(30);
-    font("bold", 11); tc(ink);
-    doc.text("Inputs", margin, y);
-    y += 16;
+    y = rCardY + resultsCardH + 16;
 
-    y = inputSection("Cattle & Ownership", [
-      [["In Date:", niceDate(inDate)], ["Total Head:", i_totalHead]],
-      [["Ownership:", i_ownership], ["Head Owned:", String(v_headOwned)]],
-      [["In Weight:", i_inWt], ["Purchase Price:", i_purchase]]
-    ], y);
+    // ---------- Scenario Inputs ----------
+    ensureSpace(28);
+    font("bold", 13); tc(ink);
+    doc.text("Scenario Inputs", margin, y);
+    y += 14;
 
-    y = inputSection("Projections", [
-      [["Out Weight:", i_outWt], ["ADG:", i_adg]],
-      [["Days on Feed:", v_dof], ["Out Date:", niceDate(outDate)]],
-      [["Cost of Gain (Dead's Out):", i_cog], ["Death Loss:", i_dl]]
-    ], y);
+    inputCard(margin, y, contentW, "Cattle & Ownership",
+      [["In Date", niceDate(inDate)], ["Ownership", i_ownership], ["In Weight", i_inWt]],
+      [["Total Head", i_totalHead], ["Head Owned", String(v_headOwned)], ["Purchase Price", i_purchase]]
+    );
 
-    y = inputSection("Financing", [
-      [["Interest Rate:", i_ir], ["Equity / Financed:", i_equity]]
-    ], y);
+    inputCard(margin, y, contentW, "Projections",
+      [["Out Weight", i_outWt], ["Days on Feed", v_dof], ["Cost of Gain (Dead's Out)", i_cog]],
+      [["ADG", i_adg], ["Out Date", niceDate(outDate)], ["Death Loss", i_dl]]
+    );
 
-    y = inputSection("Market Assumptions", [
-      [["Futures:", i_fut], ["Expected Basis:", i_bas]]
-    ], y);
+    inputCard(margin, y, contentW, "Financing",
+      [["Interest Rate", i_ir]],
+      [["Equity / Financed", i_equity]]
+    );
+
+    inputCard(margin, y, contentW, "Market Assumptions",
+      [["Futures", i_fut]],
+      [["Expected Basis", i_bas]]
+    );
+
+    // ---------- Footer (every page) ----------
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      font("normal", 7.5); tc(muted);
+      doc.text(`Generated ${niceDate(new Date())} · CMS Breakeven Calculator`, W / 2, H - 16, { align: "center" });
+    }
 
     doc.save(`${filename}.pdf`);
   }

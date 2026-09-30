@@ -87,8 +87,9 @@ test("updateAll: P/L per head/day is P/L per head divided by days on feed, using
   const result = app.updateAll();
   const expected = app.computePlPerHdPerDay(result.plPerHd, result.daysOnFeed);
   approx(result.plPerHdPerDay, expected, 1e-9);
-  assert.equal(env.get("plPerHdPerDay").textContent, `${env.get("plPerHdPerDay").textContent}`); // sanity: element exists/writable
-  assert.ok(env.get("plPerHdPerDay").textContent.includes("/hd/day"));
+  // The unit already appears in the stat's own label ("P/L /hd/day"), so the
+  // displayed value is a plain dollar amount with no unit suffix.
+  assert.match(env.get("plPerHdPerDay").textContent, /^\$-?[\d,]+\.\d{2}$/);
 });
 
 // ===================== Empty / invalid states =====================

@@ -243,11 +243,9 @@
 
     .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     .inputSectionGrid.threeCol .inDateField{ grid-column:1 / -1; }
-    .inDateField input{ width:auto; min-width:170px; max-width:220px; }
     @media (min-width:760px){
       .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr); }
       .inputSectionGrid.threeCol .inDateField{ grid-column:auto; }
-      .inDateField input{ width:100%; max-width:none; }
     }
 
     .fieldInlineRow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -415,7 +413,7 @@
       flex-wrap:wrap;
       align-items:center;
       justify-content:space-between;
-      gap:8px 16px;
+      gap:6px 10px;
       background:var(--results-bg);
       border-radius:10px;
       padding:10px 12px;
@@ -428,7 +426,8 @@
       color:var(--muted);
       line-height:1.3;
       text-align:right;
-      max-width:180px;
+      white-space:nowrap;
+      flex:0 0 auto;
     }
 
     details{
