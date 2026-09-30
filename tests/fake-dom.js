@@ -28,6 +28,12 @@ class FakeElement {
     this.readOnly = false;
     this.tabIndex = 0;
     this.scrollHeight = 200;
+    // scrollWidth/clientWidth default equal (0) so fitValueText's shrink
+    // loop (scrollWidth > clientWidth) never engages under the fake DOM —
+    // there's no real layout to measure here.
+    this.scrollWidth = 0;
+    this.clientWidth = 0;
+    this.style = {};
     this._attrs = {};
     this._listeners = {};
   }

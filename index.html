@@ -33,6 +33,7 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background:var(--bg);
       color:#0f172a;
+      overflow-x:hidden;
     }
 
     header{
@@ -96,7 +97,7 @@
     .mobileStickyItem{
       flex:1 1 0;
       background:var(--results-bg);
-      padding:16px 18px 18px;
+      padding:14px 14px 16px;
       display:flex;
       flex-direction:column;
       align-items:flex-start;
@@ -105,14 +106,13 @@
     }
     .mobileStickyItem .k{ font-size:13px; color:var(--muted); font-weight:700; }
     .mobileStickyItem .v{
-      font-size:26px;
+      font-size:24px;
       font-weight:900;
       color:#0f172a;
       line-height:1.15;
       max-width:100%;
-    }
-    @media (min-width:400px){
-      .mobileStickyItem .v{ font-size:30px; }
+      white-space:nowrap;
+      overflow:hidden;
     }
     .mobileStickyItem.good .v{ color:var(--good-tx); }
     .mobileStickyItem.mid .v{  color:var(--mid-tx); }
@@ -275,11 +275,11 @@
       .inputSectionGrid.threeCol{ grid-template-columns:repeat(2, minmax(0,1fr)); }
     }
     @media (min-width:760px){
-      .inputSectionGrid.threeCol{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+      .inputSectionGrid.threeCol{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr); }
     }
 
-    .fieldInlineRow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .fieldInlineRow input{ flex:1 1 80px; min-width:0; }
+    .fieldInlineRow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .fieldInlineRow input{ flex:0 1 74px; min-width:64px; width:auto; padding-right:6px; }
     .fieldInlineRow .fieldHelper{ margin-top:0; white-space:nowrap; flex:0 0 auto; }
 
     .tipBadge{
@@ -408,17 +408,12 @@
     .metric.hero{ padding:12px 14px; }
     .metric.hero .k{ font-size:12px; }
     .metric.hero .v{
-      font-size:20px;
+      font-size:27px;
       font-weight:900;
       margin-top:3px;
       line-height:1.15;
-      white-space:normal;
-    }
-    @media (min-width:420px){
-      .metric.hero .v{ font-size:24px; }
-    }
-    @media (min-width:700px){
-      .metric.hero .v{ font-size:27px; }
+      white-space:nowrap;
+      overflow:hidden;
     }
 
     .resultSection{

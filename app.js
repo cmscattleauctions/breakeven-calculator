@@ -262,6 +262,25 @@
     });
   }
 
+  // ===================== Shrink-to-fit big numbers =====================
+  // Never wraps (the element is white-space:nowrap in CSS) — instead steps
+  // the font size down until the text fits on one line within its box.
+  function fitValueText(el, idealPx, minPx){
+    if (!el) return;
+    el.style.fontSize = idealPx + "px";
+    let size = idealPx;
+    while (el.scrollWidth > el.clientWidth + 0.5 && size > minPx) {
+      size -= 1;
+      el.style.fontSize = size + "px";
+    }
+  }
+  function fitBigValues(){
+    fitValueText($("plPerHd"), 27, 13);
+    fitValueText($("projectedTotalPL"), 27, 13);
+    fitValueText($("mStickyPlPerHd"), 24, 12);
+    fitValueText($("mStickyTotalPL"), 24, 12);
+  }
+
   function updateFeedPeriod(){
     const inWeight = numOrNaN("inWeight");
     const outWeight = numOrNaN("outWeight");
@@ -446,7 +465,7 @@
     const inDate = parseDateOrNull("inDate");
     const outDate = updateOutDateInline();
 
-    requestAnimationFrame(() => { updateResultsSticky(); syncMobileStickyBar(); });
+    requestAnimationFrame(() => { updateResultsSticky(); syncMobileStickyBar(); fitBigValues(); });
 
     const daysOnFeed = numOrNaN("daysOnFeed");
     const interestRatePct = numOrNaN("interestRatePct");
@@ -1134,7 +1153,7 @@
         { label: "Annualized ROE", value: v_aroe },
         { label: "IRR", value: v_irr }
       ], y);
-      y += 20;
+      y += 30;
       if (showZeroEquityNote) {
         font("normal", 8); tc(muted);
         const wrapped = doc.splitTextToSize(zeroEquityNoteText, contentW);
@@ -1305,7 +1324,7 @@
     $("shareScenarioBtn")?.addEventListener("click", shareScenario);
 
     $("detailsPanel")?.addEventListener("toggle", () => updateResultsSticky());
-    window.addEventListener("resize", () => updateResultsSticky());
+    window.addEventListener("resize", () => { updateResultsSticky(); fitBigValues(); });
 
     applyQuickRunUI();
     applyDofAdgModeUI();
