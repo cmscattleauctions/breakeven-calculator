@@ -357,6 +357,7 @@
     const label = $("contractsLabel");
     const tip = $("contractsTooltip");
     const basisCell = $("d_contractsBasis");
+    const supporting = $("hedgeSupportingText");
 
     if (!tile || !val || !label) return;
 
@@ -367,6 +368,7 @@
       val.textContent = "—";
       label.textContent = "Contracts Needed";
       basisCell && (basisCell.textContent = "—");
+      if (supporting) supporting.textContent = "";
       return;
     }
 
@@ -381,6 +383,16 @@
 
     if (tip) tip.textContent = msg;
     if (basisCell) basisCell.textContent = msg;
+
+    // Supporting line uses only data already computed elsewhere (contract
+    // size from the hedging calc, futures price from Market Assumptions) —
+    // no new calculation logic.
+    if (supporting) {
+      const futures = numOrNaN("futures");
+      supporting.textContent = isFinite(futures)
+        ? `Based on ${info.denomLb.toLocaleString()} lbs hedged at ${money(futures)}/cwt`
+        : "";
+    }
   }
 
   // ===================== UI toggles =====================
@@ -1219,7 +1231,7 @@
     const irVals  = rangeValues({ start: 0.00, end: 25.00, step: 0.05, decimals: 2 });
     const cogVals = rangeValues({ start: 0.75, end: 1.50, step: 0.01, decimals: 2 });
     const dlVals  = rangeValues({ start: 0.0,  end: 100.0, step: 0.5,  decimals: 1 });
-    const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 5.0, decimals: 0 });
+    const bVals   = rangeValues({ start: -100.0, end: 100.0, step: 1.0, decimals: 0 });
     const eqVals  = rangeValues({ start: 0.0,  end: 100.0, step: 5.0,  decimals: 0 });
 
     attachMobilePicker("interestRatePct", {
