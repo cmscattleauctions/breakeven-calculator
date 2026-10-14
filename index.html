@@ -190,6 +190,19 @@
       font-size:15px;
       background:#fff;
     }
+    select{
+      width:100%;
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      font-size:15px;
+      background:#fff;
+      color:#0f172a;
+    }
+    select:focus{
+      outline:2px solid rgba(51,102,153,.25);
+      border-color:rgba(51,102,153,.45);
+    }
     input:focus{
       outline:2px solid rgba(51,102,153,.25);
       border-color:rgba(51,102,153,.45);
@@ -570,6 +583,7 @@
           <h2>Inputs</h2>
           <div class="headerActions">
             <button id="resetBtn" class="textLink" type="button">Reset</button>
+            <button id="targetPriceBtn" class="pillToggle" type="button" data-on="false">Target Price: OFF</button>
             <button id="quickRunBtn" class="pillToggle" type="button" data-on="false">Quick Run: OFF</button>
           </div>
         </div>
@@ -606,9 +620,29 @@
               </div>
 
               <div class="field">
-                <label>Purchase Price ($/cwt)</label>
-                <input id="priceCwt" type="number" inputmode="decimal" placeholder="e.g., 240" />
+                <label id="priceCwtLabel">Purchase Price ($/cwt)</label>
+                <input id="priceCwt" type="text" inputmode="decimal" placeholder="e.g., 240" />
               </div>
+            </div>
+
+            <div class="hidden" id="wrapTargetInputs" style="margin-top:8px;">
+              <div class="pairRow">
+                <div class="field">
+                  <label for="targetMode">Solve price for</label>
+                  <select id="targetMode">
+                    <option value="plPerHd">Profit / head</option>
+                    <option value="plPerHdPerDay">Profit / head / day</option>
+                    <option value="totalPL">Total profit</option>
+                    <option value="roe">ROE</option>
+                    <option value="annualRoe">Annualized ROE</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="targetValue" id="targetValueLabel">Profit ($/hd)</label>
+                  <input id="targetValue" type="number" inputmode="decimal" placeholder="e.g., 100" />
+                </div>
+              </div>
+              <div class="fieldHelper" id="targetPriceNote"></div>
             </div>
           </div>
 

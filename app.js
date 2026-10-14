@@ -4,6 +4,7 @@
 
   // ===================== State =====================
   let quickRun = false;
+  let targetPriceMode = false; // true = solve Purchase Price from a profit/ROE target
   let adgInputMode = true; // true = input ADG (dof calculated); false = input Days on Feed (adg calculated)
   let equityExpanderOpen = false; // visual only — never affects the stored equity value
   const BASIS_DEFAULT = "";
@@ -98,6 +99,69 @@
 
   function computePlPerHdPerDay(plPerHd, daysOnFeed) {
     return (isFinite(plPerHd) && isFinite(daysOnFeed) && daysOnFeed > 0) ? (plPerHd / daysOnFeed) : NaN;
+  }
+
+  // Reverse breakeven: the purchase price ($/cwt) that hits a chosen target.
+  // Total cost/hd is linear in purchase price (purchase cost, death loss and
+  // interest all scale with it), so it's solved exactly as cost = a + b·P
+  // using computeCostBreakdown itself — no separate copy of the cost math.
+  //
+  // targetMode: "plPerHd" ($/hd) · "plPerHdPerDay" ($/hd/day) ·
+  //             "totalPL" ($, needs myHead) · "roe" (%) · "annualRoe" (%)
+  //
+  // Returns { maxPriceCwt, targetCostPerHd, salesPerHd } or null when the
+  // inputs can't support a solve. maxPriceCwt may be ≤ 0, meaning the
+  // target isn't reachable at any purchase price — callers surface that.
+  const TARGET_MODES = ["plPerHd", "plPerHdPerDay", "totalPL", "roe", "annualRoe"];
+
+  function solvePurchasePrice({
+    inWeight, outWeight, cogNoInterest, deathLossPct, interestRatePct, daysOnFeed, equityPct,
+    salesPrice, targetMode, targetValue, myHead
+  }) {
+    const ok =
+      isFinite(inWeight) && inWeight > 0 &&
+      isFinite(outWeight) && outWeight > inWeight &&
+      isFinite(cogNoInterest) &&
+      isFinite(deathLossPct) && deathLossPct >= 0 &&
+      isFinite(interestRatePct) && interestRatePct >= 0 &&
+      isFinite(daysOnFeed) && daysOnFeed > 0 &&
+      isFinite(salesPrice) && isFinite(targetValue) &&
+      TARGET_MODES.includes(targetMode);
+    if (!ok) return null;
+
+    const base = { inWeight, outWeight, cogNoInterest, deathLossPct, interestRatePct, daysOnFeed, equityPct };
+    const a = computeCostBreakdown({ ...base, priceCwt: 0 }).totalCostPerHd;
+    const b = computeCostBreakdown({ ...base, priceCwt: 1 }).totalCostPerHd - a;
+    if (!(b > 0)) return null;
+
+    const salesPerHd = (salesPrice * outWeight) / 100.0;
+    let targetCostPerHd;
+
+    if (targetMode === "plPerHd") {
+      targetCostPerHd = salesPerHd - targetValue;
+    } else if (targetMode === "plPerHdPerDay") {
+      targetCostPerHd = salesPerHd - targetValue * daysOnFeed;
+    } else if (targetMode === "totalPL") {
+      if (!(isFinite(myHead) && myHead > 0)) return null;
+      targetCostPerHd = salesPerHd - targetValue / myHead;
+    } else {
+      // ROE = P/L ÷ basis, where basis = cost × equity share (or full cost
+      // at 0% equity — same fallback as computeReturns). Per head:
+      // (S − C) / (C·k) = r  →  C = S / (1 + r·k)
+      let roe = targetValue / 100.0;
+      if (targetMode === "annualRoe") {
+        if (!(roe > -1)) return null;
+        roe = Math.pow(1 + roe, daysOnFeed / 365.0) - 1;
+      }
+      const { equityFraction } = computeFinancing(equityPct);
+      const k = equityFraction > 0 ? equityFraction : 1;
+      const denom = 1 + roe * k;
+      if (!(denom > 0)) return null;
+      targetCostPerHd = salesPerHd / denom;
+    }
+
+    const maxPriceCwt = (targetCostPerHd - a) / b;
+    return { maxPriceCwt, targetCostPerHd, salesPerHd };
   }
 
   // ===================== Parsing =====================
@@ -434,6 +498,81 @@
     $("returnsZeroEquityNote")?.classList.add("hidden");
   }
 
+  // ===================== Target purchase price (reverse breakeven) =====================
+  const TARGET_LABELS = {
+    plPerHd:       { label: "Profit ($/hd)",         placeholder: "e.g., 100" },
+    plPerHdPerDay: { label: "Profit ($/hd/day)",     placeholder: "e.g., 0.50" },
+    totalPL:       { label: "Total Profit ($)",      placeholder: "e.g., 100000" },
+    roe:           { label: "ROE (%)",               placeholder: "e.g., 10" },
+    annualRoe:     { label: "Annualized ROE (%)",    placeholder: "e.g., 15" }
+  };
+
+  function applyTargetPriceUI(){
+    const btn = $("targetPriceBtn");
+    if (btn) {
+      btn.textContent = `Target Price: ${targetPriceMode ? "ON" : "OFF"}`;
+      btn.setAttribute("data-on", targetPriceMode ? "true" : "false");
+    }
+    $("wrapTargetInputs")?.classList.toggle("hidden", !targetPriceMode);
+
+    const priceEl = $("priceCwt");
+    if (priceEl) {
+      priceEl.readOnly = targetPriceMode;
+      priceEl.tabIndex = targetPriceMode ? -1 : 0;
+      // Leaving target mode with no solvable price would strand the "—"
+      // placeholder in an editable field — clear it.
+      if (!targetPriceMode && priceEl.value === "—") priceEl.value = "";
+    }
+    setText("priceCwtLabel", "Purchase Price ($/cwt)" + (targetPriceMode ? " (calculated)" : ""));
+  }
+
+  // Target Price mode: solves the purchase price from the chosen target,
+  // shows it (rounded) in the read-only Purchase Price field, and returns
+  // the unrounded price so every result lands exactly on the target.
+  function updateTargetPrice(myHead){
+    const mode = strOrEmpty("targetMode") || "plPerHd";
+    const meta = TARGET_LABELS[mode] || TARGET_LABELS.plPerHd;
+    setText("targetValueLabel", meta.label);
+    const valueEl = $("targetValue");
+    if (valueEl) valueEl.placeholder = meta.placeholder;
+
+    const priceEl = $("priceCwt");
+    const fail = (msg) => {
+      if (priceEl) priceEl.value = "—";
+      setText("targetPriceNote", msg || "");
+      return NaN;
+    };
+
+    const targetValue = numOrNaN("targetValue");
+    if (!isFinite(targetValue)) return fail("");
+
+    if (mode === "totalPL" && !(isFinite(myHead) && myHead > 0)) {
+      return fail(quickRun ? "Turn off Quick Run to target total profit." : "Enter Total Head & Ownership to target total profit.");
+    }
+
+    const equityPctRaw = numOrNaN("equityPct");
+    const solved = solvePurchasePrice({
+      inWeight: numOrNaN("inWeight"),
+      outWeight: numOrNaN("outWeight"),
+      cogNoInterest: numOrNaN("cogNoInterest"),
+      deathLossPct: numOrNaN("deathLossPct"),
+      interestRatePct: numOrNaN("interestRatePct"),
+      daysOnFeed: numOrNaN("daysOnFeed"),
+      equityPct: isFinite(equityPctRaw) ? equityPctRaw : 0,
+      salesPrice: numOrNaN("futures") + numOrNaN("basis"),
+      targetMode: mode,
+      targetValue,
+      myHead
+    });
+
+    if (!solved) return fail("");
+    if (!(solved.maxPriceCwt > 0)) return fail("Target isn't reachable at any purchase price with these assumptions.");
+
+    if (priceEl) priceEl.value = solved.maxPriceCwt.toFixed(2);
+    setText("targetPriceNote", "");
+    return solved.maxPriceCwt;
+  }
+
   // ===================== IRR (two-point) =====================
   function irrTwoPoint(c0, c1, d0, d1) {
     const msPerDay = 24 * 60 * 60 * 1000;
@@ -466,7 +605,6 @@
     const ownership = ownershipPctRaw / 100.0;
 
     const inWeight = numOrNaN("inWeight");
-    const priceCwt = numOrNaN("priceCwt");
     const outWeight = numOrNaN("outWeight");
 
     const cogNoInterest = numOrNaN("cogNoInterest");
@@ -479,6 +617,7 @@
     const basis = numOrNaN("basis");
 
     const myHeadFromTip = updateHeadOwnedTip();
+    const priceCwt = targetPriceMode ? updateTargetPrice(myHeadFromTip) : numOrNaN("priceCwt");
 
     if (isFinite(daysOnFeed) && daysOnFeed < 0) {
       softError("Days on Feed must be > 0.");
@@ -840,6 +979,13 @@
 
     p.set("eq", strOrEmpty("equityPct") || "0");
 
+    if (targetPriceMode) {
+      p.set("tp", "1");
+      p.set("tm", strOrEmpty("targetMode") || "plPerHd");
+      const targetValue = strOrEmpty("targetValue");
+      if (targetValue !== "") p.set("tv", targetValue);
+    }
+
     const url = new URL(window.location.href);
     url.search = p.toString();
     return url.toString();
@@ -889,6 +1035,12 @@
     }
 
     if ($("equityPct")) $("equityPct").value = String(resolveEquityPct(p.get("eq")));
+
+    targetPriceMode = p.get("tp") === "1";
+    const tm = p.get("tm");
+    if (tm && TARGET_MODES.includes(tm) && $("targetMode")) $("targetMode").value = tm;
+    const tv = p.get("tv");
+    if (tv !== null && $("targetValue")) $("targetValue").value = tv;
 
     ensureBasisDefault();
   }
@@ -1253,6 +1405,14 @@
       [["Expected Basis", i_bas]]
     );
 
+    if (targetPriceMode) {
+      const t_meta = TARGET_LABELS[strOrEmpty("targetMode")] || TARGET_LABELS.plPerHd;
+      inputCard(margin, y, contentW, "Target Price",
+        [["Target " + t_meta.label, strOrEmpty("targetValue") || "—"]],
+        [["Max Purchase Price", i_purchase]]
+      );
+    }
+
     // ---------- Footer (every page) ----------
     const pageCount = doc.internal.getNumberOfPages();
     for (let p = 1; p <= pageCount; p++) {
@@ -1266,7 +1426,7 @@
 
   // ===================== Reset =====================
   function resetAll() {
-    const clearIds = ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures"];
+    const clearIds = ["daysOnFeed","totalHead","ownershipPct","inWeight","priceCwt","outWeight","futures","targetValue"];
     clearIds.forEach(id => { if ($(id)) $(id).value = ""; });
 
     const t = new Date();
@@ -1344,7 +1504,8 @@
 
     const ids = [
       "inDate","daysOnFeed","adg","totalHead","ownershipPct","inWeight","priceCwt","outWeight",
-      "cogNoInterest","deathLossPct","interestRatePct","equityPct","futures","basis"
+      "cogNoInterest","deathLossPct","interestRatePct","equityPct","futures","basis",
+      "targetMode","targetValue"
     ];
     ids.forEach(id => {
       const el = $(id);
@@ -1392,6 +1553,12 @@
     wireInfoToggle("cogInfoBtn", "cogInfoText");
     wireInfoToggle("contractsInfoBtn", "contractsTooltip");
 
+    $("targetPriceBtn")?.addEventListener("click", () => {
+      targetPriceMode = !targetPriceMode;
+      applyTargetPriceUI();
+      updateAll();
+    });
+
     $("downloadPdfBtn")?.addEventListener("click", downloadPdf);
     $("shareScenarioBtn")?.addEventListener("click", shareScenario);
 
@@ -1399,6 +1566,7 @@
     window.addEventListener("resize", () => { updateResultsSticky(); fitBigValues(); });
 
     applyQuickRunUI();
+    applyTargetPriceUI();
     applyDofAdgModeUI();
     applyEquityExpanderUI();
     updateAll();
@@ -1411,6 +1579,7 @@
       computeCostBreakdown,
       computeReturns,
       computePlPerHdPerDay,
+      solvePurchasePrice,
       irrTwoPoint,
       fmtPctShort,
       // DOM-driving functions, exposed for integration tests against a
@@ -1419,7 +1588,8 @@
       updateAll,
       resetAll,
       applyScenarioFromUrl,
-      buildScenarioUrl
+      buildScenarioUrl,
+      setTargetPriceMode: (on) => { targetPriceMode = !!on; applyTargetPriceUI(); }
     };
   }
 
